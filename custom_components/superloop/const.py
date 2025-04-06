@@ -5,9 +5,16 @@ PLATFORMS = ["sensor"]
 
 # API
 API_BASE_URL = "https://webservices.myexetel.exetel.com.au/api"
-API_LOGIN_ENDPOINT = "/auth/token"
-API_VERIFY_2FA_ENDPOINT = "https://webservices-api.superloop.com/v1/mfa"
 API_GET_SERVICES_ENDPOINT = "/getServices"
+
+# OAuth Config
+SUPERLOOP_LOGIN_URL = "https://superhub.superloop.com/login"
+AUTH_CALLBACK_PATH = "/api/superloop/auth"
+AUTH_CALLBACK_NAME = "superloop_auth_view_registered"
+
+# Config Entry Keys
+CONF_ACCESS_TOKEN = "access_token"
+CONF_REFRESH_TOKEN = "refresh_token"
 
 # Data update interval in seconds (15 minutes)
 UPDATE_INTERVAL = 15 * 60
