@@ -1,12 +1,12 @@
 {
-    "domain": "superloop",
-    "name": "Superloop",
-    "codeowners": ["@thatwebagency"],
-    "config_flow": true,
-    "dependencies": [],
-    "documentation": "https://github.com/thatwebagency/ha-superloop",
-    "iot_class": "cloud_polling",
-    "issue_tracker": "https://github.com/thatwebagency/ha-superloop/issues",
-    "requirements": ["aiohttp>=3.8.1"],
-    "version": "0.1.0"
-  }
+  "domain": "superloop",
+  "name": "Superloop",
+  "codeowners": ["@thatwebagency"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/thatwebagency/ha-superloop",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/thatwebagency/ha-superloop/issues",
+  "requirements": ["aiohttp>=3.8.1"],
+  "version": "1.0.0"
+}
