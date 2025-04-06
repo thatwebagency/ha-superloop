@@ -6,6 +6,11 @@ PLATFORMS = ["sensor"]
 # API
 API_BASE_URL = "https://webservices.myexetel.exetel.com.au/api"
 API_GET_SERVICES_ENDPOINT = "/getServices"
+API_AUTH_TOKEN_ENDPOINT = "/auth/token"
+
+# Authentication Constants
+AUTH_BRAND = "superloop"
+AUTH_PERSIST_LOGIN = False
 
 # OAuth Config
 SUPERLOOP_LOGIN_URL = "https://superhub.superloop.com/login"
@@ -15,6 +20,15 @@ AUTH_CALLBACK_NAME = "superloop_auth_view_registered"
 # Config Entry Keys
 CONF_ACCESS_TOKEN = "access_token"
 CONF_REFRESH_TOKEN = "refresh_token"
+CONF_USERNAME = "username"  # New configuration key for username
+CONF_PASSWORD = "password"  # New configuration key for password
+CONF_2FA_CODE = "two_factor_code"  # New configuration key for 2FA code if needed
+
+# Authentication Error Messages
+AUTH_ERROR_INVALID_CREDENTIALS = "Invalid username or password"
+AUTH_ERROR_2FA_REQUIRED = "Two-factor authentication required"
+AUTH_ERROR_2FA_INVALID = "Invalid two-factor authentication code"
+AUTH_ERROR_GENERIC = "Authentication failed"
 
 # Data update interval in seconds (15 minutes)
 UPDATE_INTERVAL = 15 * 60

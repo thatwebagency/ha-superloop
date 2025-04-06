@@ -30,7 +30,7 @@ from .const import (
     SENSOR_TYPE_BILLING_CYCLE_END,
     SENSOR_TYPE_EVENING_SPEED,
 )
-from .coordinator import SuperloopDataUpdateCoordinator
+from .api import SuperloopApiError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up Superloop sensors based on a config entry."""
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]  # Updated to match new structure
 
     # Check that we have valid data
     if not coordinator.data:
@@ -131,7 +131,7 @@ class SuperloopSensor(CoordinatorEntity, SensorEntity):
 
     def __init__(
         self,
-        coordinator: SuperloopDataUpdateCoordinator,
+        coordinator,
         sensor_type: str,
         name: str,
         icon: str,
@@ -148,6 +148,26 @@ class SuperloopSensor(CoordinatorEntity, SensorEntity):
         self._attr_state_class = state_class
         self._attr_device_class = device_class
         self._attr_unique_id = f"{DOMAIN}_{sensor_type}"
+        # Add service ID to the unique ID if available
+        if coordinator.data and coordinator.data.get("broadband"):
+            service = coordinator.data["broadband"][0]
+            if "id" in service:
+                self._attr_unique_id = f"{DOMAIN}_{service['id']}_{sensor_type}"
+
+    async def async_update(self) -> None:
+        """Update the sensor."""
+        # Implement retry logic for authentication failures
+        try:
+            await self.coordinator.async_request_refresh()
+        except SuperloopApiError as err:
+            _LOGGER.error(f"Error updating sensor: {err}")
+            # If this is an authentication error, we could trigger a re-auth workflow here
+            if "authentication" in str(err).lower() or "unauthorized" in str(err).lower():
+                _LOGGER.warning("Authentication error detected, consider re-authenticating")
+                # In a future version, could trigger re-auth workflow
+                # self.hass.async_create_task(
+                #    self.hass.config_entries.async_reload(self.coordinator.config_entry.entry_id)
+                # )
 
     @property
     def native_value(self) -> StateType:
@@ -288,6 +308,15 @@ class SuperloopSensor(CoordinatorEntity, SensorEntity):
             return None
             
         return None
+
+    @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        # Handle the case where the API is unavailable
+        if self.coordinator.last_update_success:
+            return True
+        # Check if we have cached data to use
+        return self.coordinator.data is not None and self.coordinator.data.get("broadband") is not None
 
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:

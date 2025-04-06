@@ -6,18 +6,27 @@
           "title": "Connect to Superloop",
           "description": "Set up Superloop integration to view your data usage details",
           "data": {
-            "email": "[%key:common::config_flow::data::email%]",
-            "password": "[%key:common::config_flow::data::password%]"
+            "username": "Email Address",
+            "password": "Password"
+          }
+        },
+        "two_factor": {
+          "title": "Two-Factor Authentication",
+          "description": "Enter the verification code sent to your device",
+          "data": {
+            "two_factor_code": "Verification Code"
           }
         }
       },
       "error": {
-        "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
-        "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
-        "unknown": "[%key:common::config_flow::error::unknown%]"
+        "cannot_connect": "Failed to connect to Superloop. Please try again.",
+        "invalid_auth": "Invalid username or password",
+        "invalid_2fa": "Invalid verification code",
+        "unknown": "Unexpected error occurred"
       },
       "abort": {
-        "already_configured": "[%key:common::config_flow::abort::already_configured_account%]"
+        "already_configured": "This Superloop account is already configured",
+        "reauth_successful": "Re-authentication was successful"
       }
     }
   }

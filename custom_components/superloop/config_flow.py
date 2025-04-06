@@ -2,23 +2,20 @@
 import logging
 import voluptuous as vol
 from typing import Any, Dict, Optional
-import secrets
-import aiohttp
 
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.components.http import HomeAssistantView
 
-from .api import SuperloopClient
+from .api import SuperloopClient, SuperloopApiError
 from .const import (
     DOMAIN,
-    AUTH_CALLBACK_PATH,
-    AUTH_CALLBACK_NAME,
-    SUPERLOOP_LOGIN_URL,
+    CONF_USERNAME,
+    CONF_PASSWORD,
     CONF_ACCESS_TOKEN,
-    CONF_REFRESH_TOKEN
+    CONF_REFRESH_TOKEN,
+    AUTH_ERROR_INVALID_CREDENTIALS
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -31,87 +28,89 @@ class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def __init__(self):
         """Initialize."""
-        self._state = None
-        self._session = None
+        self._username = None
+        self._password = None
+        self._client = None
+        self._reauth_entry = None
 
     async def async_step_user(self, user_input=None):
         """Handle the initial step."""
-        # Generate a random state for security
-        self._state = secrets.token_hex(16)
-        self._session = async_get_clientsession(self.hass)
-        
-        # Register the callback view if not already registered
-        self._register_auth_callback()
-        
-        return self.async_external_step(
-            step_id="auth",
-            url=f"{SUPERLOOP_LOGIN_URL}?state={self._state}&redirect_uri={self.hass.config.api.base_url}{AUTH_CALLBACK_PATH}"
-        )
+        errors = {}
 
-    async def async_step_auth(self, user_input=None):
-        """Handle the callback after authorization."""
-        # This will not be called directly, 
-        # but will be the target of the external_step when the callback view redirects
-        return self.async_external_step_done(next_step_id="finish")
+        # Check if already configured
+        await self.async_set_unique_id(DOMAIN)
+        self._abort_if_unique_id_configured()
 
-    async def async_step_finish(self, data=None):
-        """Handle the final step after OAuth."""
-        if not data or not data.get(CONF_ACCESS_TOKEN):
-            return self.async_abort(reason="auth_failed")
-        
-        # Create entry with the received tokens
-        return self.async_create_entry(
-            title="Superloop",
-            data={
-                CONF_ACCESS_TOKEN: data[CONF_ACCESS_TOKEN],
-                CONF_REFRESH_TOKEN: data.get(CONF_REFRESH_TOKEN, "")
-            }
-        )
+        if user_input is not None:
+            self._username = user_input[CONF_USERNAME]
+            self._password = user_input[CONF_PASSWORD]
 
-    def _register_auth_callback(self):
-        """Register the auth callback handler."""
-        if not hasattr(self.hass, AUTH_CALLBACK_NAME):
-            self.hass.http.register_view(SuperloopAuthCallbackView())
-            setattr(self.hass, AUTH_CALLBACK_NAME, True)
+            session = async_get_clientsession(self.hass)
+            self._client = SuperloopClient(session=session)
 
-
-class SuperloopAuthCallbackView(HomeAssistantView):
-    """Superloop Authorization Callback View."""
-
-    url = AUTH_CALLBACK_PATH
-    name = "api:superloop:auth"
-    requires_auth = False
-
-    @callback
-    async def get(self, request):
-        """Handle callback from Superloop."""
-        hass = request.app["hass"]
-        
-        # Get URL parameters
-        state = request.query.get("state")
-        access_token = request.query.get("access_token")
-        refresh_token = request.query.get("refresh_token")
-        error = request.query.get("error")
-        
-        if error:
-            _LOGGER.error(f"Error during authorization: {error}")
-            return self.json({"error": error})
-        
-        # Find the flow based on the state
-        for flow in hass.config_entries.flow.async_progress():
-            if flow["handler"] == DOMAIN and flow.get("context", {}).get("state") == state:
-                # Complete the flow with the tokens
-                await hass.config_entries.flow.async_configure(
-                    flow["flow_id"], 
-                    {
-                        CONF_ACCESS_TOKEN: access_token, 
-                        CONF_REFRESH_TOKEN: refresh_token
-                    }
-                )
+            try:
+                # Attempt to authenticate with provided credentials
+                authenticated = await self._client.authenticate(self._username, self._password)
                 
-                # Show success page
-                return self.json({"success": True})
-        
-        # No matching flow found
-        _LOGGER.error("No matching authorization flow found")
-        return self.json({"error": "invalid_state"})
+                if authenticated:
+                    # Authentication successful, create entry
+                    return self.async_create_entry(
+                        title=self._username,
+                        data={
+                            CONF_USERNAME: self._username,
+                            CONF_PASSWORD: self._password,
+                            CONF_ACCESS_TOKEN: self._client.get_access_token(),
+                            CONF_REFRESH_TOKEN: self._client.get_refresh_token()
+                        }
+                    )
+                else:
+                    errors["base"] = "invalid_auth"
+            except SuperloopApiError as error:
+                _LOGGER.exception("Error authenticating with Superloop API")
+                errors["base"] = "invalid_auth" if str(error) == AUTH_ERROR_INVALID_CREDENTIALS else "cannot_connect"
+            except Exception as error:
+                _LOGGER.exception("Unexpected error during Superloop authentication")
+                errors["base"] = "unknown"
+
+        # Show form
+        return self.async_show_form(
+            step_id="user",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_USERNAME): str,
+                    vol.Required(CONF_PASSWORD): str,
+                }
+            ),
+            errors=errors
+        )
+
+    async def async_step_reauth(self, user_input=None):
+        """Handle reauth when tokens are no longer valid."""
+        self._reauth_entry = self.hass.config_entries.async_get_entry(
+            self.context["entry_id"]
+        )
+        return await self.async_step_user()
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry):
+        """Get the options flow for this handler."""
+        return SuperloopOptionsFlowHandler(config_entry)
+
+
+class SuperloopOptionsFlowHandler(config_entries.OptionsFlow):
+    """Handle Superloop options."""
+
+    def __init__(self, config_entry):
+        """Initialize options flow."""
+        self.config_entry = config_entry
+
+    async def async_step_init(self, user_input=None):
+        """Manage the options."""
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema({})
+        )

@@ -3,13 +3,18 @@ import logging
 import asyncio
 import aiohttp
 import async_timeout
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from .const import (
     API_BASE_URL, 
     API_GET_SERVICES_ENDPOINT,
+    API_AUTH_TOKEN_ENDPOINT,
+    AUTH_BRAND,
+    AUTH_PERSIST_LOGIN,
     CONF_ACCESS_TOKEN,
-    CONF_REFRESH_TOKEN
+    CONF_REFRESH_TOKEN,
+    AUTH_ERROR_INVALID_CREDENTIALS,
+    AUTH_ERROR_GENERIC
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -32,6 +37,49 @@ class SuperloopClient:
         self._access_token = access_token
         self._refresh_token = refresh_token
 
+    async def authenticate(self, username: str, password: str) -> bool:
+        """Authenticate with Superloop API using username and password."""
+        try:
+            _LOGGER.debug("Authenticating with Superloop API")
+            
+            auth_data = {
+                "username": username,
+                "password": password,
+                "persistLogin": AUTH_PERSIST_LOGIN,
+                "brand": AUTH_BRAND
+            }
+            
+            with async_timeout.timeout(30):
+                response = await self._session.post(
+                    f"{API_BASE_URL}{API_AUTH_TOKEN_ENDPOINT}",
+                    json=auth_data
+                )
+                
+                _LOGGER.debug(f"Authentication response status: {response.status}")
+                
+                if response.status != 200:
+                    response_text = await response.text()
+                    _LOGGER.error(f"Authentication failed: {response.status}, {response_text}")
+                    if response.status == 401:
+                        raise SuperloopApiError(AUTH_ERROR_INVALID_CREDENTIALS)
+                    else:
+                        raise SuperloopApiError(f"{AUTH_ERROR_GENERIC}: {response.status}")
+                
+                data = await response.json()
+                self._access_token = data.get("access_token")
+                self._refresh_token = data.get("refresh_token")
+                
+                return bool(self._access_token and self._refresh_token)
+                
+        except (aiohttp.ClientError, asyncio.TimeoutError) as error:
+            _LOGGER.error(f"Error during authentication: {error}")
+            raise SuperloopApiError(f"Error communicating with Superloop API: {error}")
+        except SuperloopApiError:
+            raise
+        except Exception as e:
+            _LOGGER.exception(f"Unexpected exception during authentication: {e}")
+            raise SuperloopApiError(f"Unexpected error: {e}")
+    
     def get_access_token(self) -> str:
         """Get the current access token."""
         return self._access_token
@@ -39,6 +87,11 @@ class SuperloopClient:
     def get_refresh_token(self) -> str:
         """Get the current refresh token."""
         return self._refresh_token
+
+    def set_tokens(self, access_token: str, refresh_token: str) -> None:
+        """Set the access and refresh tokens."""
+        self._access_token = access_token
+        self._refresh_token = refresh_token
 
     async def get_services(self) -> Dict[str, Any]:
         """Get the services data from the Superloop API."""
@@ -93,21 +146,23 @@ class SuperloopClient:
     
     async def refresh_token(self) -> bool:
         """Refresh the access token using refresh token."""
-        # Implement token refresh logic here based on Superloop API
-        # This is a placeholder - you'll need to adapt to Superloop's token refresh endpoint
         if not self._refresh_token:
+            _LOGGER.error("No refresh token available")
             return False
             
         try:
-            _LOGGER.debug("Refreshing access token")
+            _LOGGER.debug("Refreshing token")
             
             with async_timeout.timeout(30):
                 refresh_data = {
-                    "refresh_token": self._refresh_token
+                    "grant_type": "refresh_token",
+                    "refresh_token": self._refresh_token,
+                    "persistLogin": AUTH_PERSIST_LOGIN,
+                    "brand": AUTH_BRAND
                 }
                 
                 response = await self._session.post(
-                    f"{API_BASE_URL}/v1/auth/refresh",  # Adjust to the actual refresh endpoint
+                    f"{API_BASE_URL}{API_AUTH_TOKEN_ENDPOINT}", 
                     json=refresh_data
                 )
                 
