@@ -1,0 +1,4 @@
+# Superloop Services
+refresh_data:
+  name: Refresh Data
+  description: Refresh the Superloop data from the API

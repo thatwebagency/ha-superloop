@@ -1,0 +1,94 @@
+{
+    "config": {
+      "step": {
+        "user": {
+          "title": "Superloop Account",
+          "description": "Enter your Superloop account credentials",
+          "data": {
+            "email": "Email",
+            "password": "Password"
+          }
+        },
+        "reauth_confirm": {
+          "title": "Superloop Re-authentication",
+          "description": "Please re-enter your Superloop credentials",
+          "data": {
+            "email": "Email",
+            "password": "Password"
+          }
+        }
+      },
+      "error": {
+        "cannot_connect": "Failed to connect to Superloop API",
+        "invalid_auth": "Invalid email or password",
+        "unknown": "Unexpected error occurred"
+      },
+      "abort": {
+        "already_configured": "Account is already configured",
+        "reauth_successful": "Re-authentication was successful"
+      }
+    },
+    "entity": {
+      "sensor": {
+        "data_used": {
+          "name": "Data Used",
+          "state_attributes": {
+            "last_updated": "Last Updated",
+            "service_id": "Service ID",
+            "service_type": "Service Type",
+            "plan_name": "Plan Name"
+          }
+        },
+        "data_remaining": {
+          "name": "Data Remaining",
+          "state_attributes": {
+            "last_updated": "Last Updated",
+            "service_id": "Service ID",
+            "service_type": "Service Type",
+            "plan_name": "Plan Name"
+          }
+        },
+        "data_limit": {
+          "name": "Data Limit",
+          "state_attributes": {
+            "last_updated": "Last Updated",
+            "service_id": "Service ID",
+            "service_type": "Service Type",
+            "plan_name": "Plan Name"
+          }
+        },
+        "days_remaining": {
+          "name": "Days Remaining",
+          "state_attributes": {
+            "service_id": "Service ID",
+            "service_type": "Service Type",
+            "plan_name": "Plan Name"
+          }
+        },
+        "plan_speed": {
+          "name": "Plan Speed",
+          "state_attributes": {
+            "service_id": "Service ID",
+            "service_type": "Service Type",
+            "plan_name": "Plan Name"
+          }
+        },
+        "billing_cycle_start": {
+          "name": "Billing Cycle Start",
+          "state_attributes": {
+            "service_id": "Service ID",
+            "service_type": "Service Type",
+            "plan_name": "Plan Name"
+          }
+        },
+        "billing_cycle_end": {
+          "name": "Billing Cycle End",
+          "state_attributes": {
+            "service_id": "Service ID",
+            "service_type": "Service Type",
+            "plan_name": "Plan Name"
+          }
+        }
+      }
+    }
+  }
