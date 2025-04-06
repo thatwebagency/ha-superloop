@@ -3,12 +3,13 @@ import logging
 import asyncio
 import aiohttp
 import async_timeout
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from .const import (
     API_BASE_URL, 
     API_LOGIN_ENDPOINT, 
-    API_GET_SERVICES_ENDPOINT
+    API_GET_SERVICES_ENDPOINT,
+    API_VERIFY_2FA_ENDPOINT,  # Add this to your const.py
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -34,6 +35,7 @@ class SuperloopClient:
         self._session = session
         self._access_token = access_token
         self._refresh_token = refresh_token
+        self._auth_flow_id = None  # Add flow ID to track 2FA
 
     def get_access_token(self) -> str:
         """Get the current access token."""
@@ -43,8 +45,14 @@ class SuperloopClient:
         """Get the current refresh token."""
         return self._refresh_token
 
-    async def authenticate(self) -> bool:
-        """Authenticate with the Superloop API."""
+    async def authenticate(self) -> Tuple[bool, Dict[str, Any]]:
+        """Authenticate with the Superloop API.
+        
+        Returns:
+            tuple: (success, result)
+                - success: True if auth succeeded or needs 2FA, False if failed
+                - result: Dict containing 2FA details if needed, or None
+        """
         try:
             _LOGGER.debug("Authenticating with Superloop API")
             
@@ -67,6 +75,70 @@ class SuperloopClient:
                     _LOGGER.error(f"Authentication failed: {response.status}")
                     response_text = await response.text()
                     _LOGGER.debug(f"Authentication error response: {response_text}")
+                    return False, None
+                
+                data = await response.json()
+
+                # Check if 2FA is required
+                if data.get("requires_2fa", False):
+                    self._auth_flow_id = data.get("flow_id")
+                    return True, {
+                        "requires_2fa": True,
+                        "flow_id": self._auth_flow_id,
+                        "message": data.get("message", "Please enter 2FA code sent via SMS")
+                    }
+                
+                # Store tokens
+                self._access_token = data.get("access_token")
+                self._refresh_token = data.get("refresh_token")
+                
+                if not self._access_token:
+                    _LOGGER.error("No access token in response")
+                    return False, None
+                    
+                _LOGGER.debug("Authentication successful")
+                return True, None
+                
+        except (aiohttp.ClientError, asyncio.TimeoutError) as error:
+            _LOGGER.error(f"Error authenticating with Superloop API: {error}")
+            return False, None
+        except Exception as e:
+            _LOGGER.exception(f"Unexpected exception during authentication: {e}")
+            return False, None
+
+    async def verify_2fa(self, code: str) -> bool:
+        """Verify the 2FA code and complete authentication.
+
+        Args:
+            code: The 2FA code received via SMS
+
+        Returns:
+            bool: True if verification succeeded, False otherwise
+        """
+        if not self._auth_flow_id:
+            _LOGGER.error("No authentication flow in progress")
+            return False
+
+        try:
+            _LOGGER.debug("Verifying 2FA code")
+            
+            with async_timeout.timeout(30):
+                verify_data = {
+                    "code": code,
+                    "flow_id": self._auth_flow_id
+                }
+                
+                response = await self._session.post(
+                    f"{API_VERIFY_2FA_ENDPOINT}",
+                    json=verify_data
+                )
+                
+                _LOGGER.debug(f"2FA verification response status: {response.status}")
+                
+                if response.status != 200:
+                    _LOGGER.error(f"2FA verification failed: {response.status}")
+                    response_text = await response.text()
+                    _LOGGER.debug(f"2FA verification error response: {response_text}")
                     return False
                 
                 data = await response.json()
@@ -76,18 +148,19 @@ class SuperloopClient:
                 self._refresh_token = data.get("refresh_token")
                 
                 if not self._access_token:
-                    _LOGGER.error("No access token in response")
+                    _LOGGER.error("No access token in 2FA response")
                     return False
                     
-                _LOGGER.debug("Authentication successful")
+                _LOGGER.debug("2FA verification successful")
                 return True
                 
         except (aiohttp.ClientError, asyncio.TimeoutError) as error:
-            _LOGGER.error(f"Error authenticating with Superloop API: {error}")
+            _LOGGER.error(f"Error verifying 2FA code: {error}")
             return False
         except Exception as e:
-            _LOGGER.exception(f"Unexpected exception during authentication: {e}")
+            _LOGGER.exception(f"Unexpected exception during 2FA verification: {e}")
             return False
+
 
     async def get_services(self) -> Dict[str, Any]:
         """Get the services data from the Superloop API."""

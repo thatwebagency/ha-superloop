@@ -6,6 +6,7 @@ PLATFORMS = ["sensor"]
 # API
 API_BASE_URL = "https://webservices.myexetel.exetel.com.au/api"
 API_LOGIN_ENDPOINT = "/auth/token"
+API_VERIFY_2FA_ENDPOINT = "https://webservices-api.superloop.com/v1/mfa"
 API_GET_SERVICES_ENDPOINT = "/getServices"
 
 # Data update interval in seconds (15 minutes)
