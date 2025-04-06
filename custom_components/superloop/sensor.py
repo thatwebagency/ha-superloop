@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Dict, Optional
 from datetime import datetime
 
@@ -27,6 +28,7 @@ from .const import (
     SENSOR_TYPE_PLAN_SPEED,
     SENSOR_TYPE_BILLING_CYCLE_START,
     SENSOR_TYPE_BILLING_CYCLE_END,
+    SENSOR_TYPE_EVENING_SPEED,
 )
 from .coordinator import SuperloopDataUpdateCoordinator
 
@@ -38,12 +40,19 @@ async def async_setup_entry(
     """Set up Superloop sensors based on a config entry."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
 
-    # Parse the first service to extract relevant data
-    if not coordinator.data or "services" not in coordinator.data or not coordinator.data["services"]:
-        _LOGGER.error("No services found in Superloop data")
+    # Check that we have valid data
+    if not coordinator.data:
+        _LOGGER.error("No data received from Superloop API")
         return
-
-    service = coordinator.data["services"][0]  # Assuming we want the first service
+        
+    # The response format is different than originally expected
+    # It has broadband, mobile, and phone as top-level keys
+    if not coordinator.data.get("broadband"):
+        _LOGGER.error("No broadband services found in Superloop data")
+        return
+        
+    # Use the first broadband service
+    service = coordinator.data["broadband"][0]
     
     entities = [
         SuperloopSensor(
@@ -82,6 +91,14 @@ async def async_setup_entry(
             coordinator,
             SENSOR_TYPE_PLAN_SPEED,
             "Plan Speed",
+            "mdi:speedometer",
+            DATA_MEGABITS_PER_SECOND,
+            SensorStateClass.MEASUREMENT,
+        ),
+        SuperloopSensor(
+            coordinator,
+            SENSOR_TYPE_EVENING_SPEED,
+            "Evening Speed",
             "mdi:speedometer",
             DATA_MEGABITS_PER_SECOND,
             SensorStateClass.MEASUREMENT,
@@ -135,67 +152,139 @@ class SuperloopSensor(CoordinatorEntity, SensorEntity):
     @property
     def native_value(self) -> StateType:
         """Return the state of the sensor."""
-        if not self.coordinator.data or "services" not in self.coordinator.data or not self.coordinator.data["services"]:
+        if not self.coordinator.data or not self.coordinator.data.get("broadband"):
             return None
             
-        service = self.coordinator.data["services"][0]  # Assuming first service
+        service = self.coordinator.data["broadband"][0]  # Using first broadband service
         
         if self._sensor_type == SENSOR_TYPE_DATA_USED:
-            # Extract used data from the service response
-            if "usage" in service and "totalUsedMB" in service["usage"]:
-                # Convert MB to GB
-                return round(service["usage"]["totalUsedMB"] / 1024, 2)
+            # Extract used data from usage summary
+            if "usageSummary" in service and "totalBytes" in service["usageSummary"]:
+                # Convert bytes to GB
+                return round(service["usageSummary"]["totalBytes"] / 1024 / 1024 / 1024, 2)
+            elif "usageSummary" in service and "total" in service["usageSummary"]:
+                # Parse from the total string (e.g., "323.27GB")
+                try:
+                    data_str = service["usageSummary"]["total"]
+                    data_value = float(re.search(r'([\d.]+)', data_str).group(1))
+                    return data_value
+                except (AttributeError, ValueError):
+                    return None
             return None
             
         elif self._sensor_type == SENSOR_TYPE_DATA_REMAINING:
-            # Calculate remaining data
-            if "usage" in service and "totalUsedMB" in service["usage"] and "includedQuotaMB" in service["usage"]:
-                used_mb = service["usage"]["totalUsedMB"]
-                total_mb = service["usage"]["includedQuotaMB"]
-                remaining_mb = max(0, total_mb - used_mb)
-                return round(remaining_mb / 1024, 2)
+            # For unlimited plans, there's no data remaining to calculate
+            if "isUnlimitedUsage" in service and service["isUnlimitedUsage"]:
+                return float('inf')  # Infinity for unlimited
+                
+            # If there's a usage summary with data limit, calculate remaining
+            if "usageSummary" in service:
+                # Check if the summaryText has the format like "323.27GB/Unlimited" or "50GB/100GB"
+                summary = service["usageSummary"].get("summaryText", "")
+                if "/" in summary:
+                    parts = summary.split("/")
+                    if "nlimited" in parts[1]:  # Match "Unlimited" case-insensitive
+                        return float('inf')  # Infinity for unlimited
+                    
+                    try:
+                        used_str = parts[0]
+                        limit_str = parts[1]
+                        
+                        used_value = float(re.search(r'([\d.]+)', used_str).group(1))
+                        limit_value = float(re.search(r'([\d.]+)', limit_str).group(1))
+                        
+                        return round(limit_value - used_value, 2)
+                    except (AttributeError, ValueError, IndexError):
+                        return None
             return None
             
         elif self._sensor_type == SENSOR_TYPE_DATA_LIMIT:
-            # Extract data limit
-            if "usage" in service and "includedQuotaMB" in service["usage"]:
-                return round(service["usage"]["includedQuotaMB"] / 1024, 2)
+            # For unlimited plans, return a very large number
+            if "isUnlimitedUsage" in service and service["isUnlimitedUsage"]:
+                return float('inf')  # Infinity for unlimited
+                
+            # If there's a usage summary with data limit in the summaryText
+            if "usageSummary" in service:
+                summary = service["usageSummary"].get("summaryText", "")
+                if "/" in summary:
+                    limit_part = summary.split("/")[1]
+                    if "nlimited" in limit_part:  # Match "Unlimited" case-insensitive
+                        return float('inf')  # Infinity for unlimited
+                    
+                    try:
+                        limit_value = float(re.search(r'([\d.]+)', limit_part).group(1))
+                        return limit_value
+                    except (AttributeError, ValueError):
+                        return None
+                        
+            # Check if allowance field contains the data limit
+            if "allowance" in service:
+                allowance = service["allowance"]
+                if "nlimited" in allowance:  # Match "Unlimited" case-insensitive
+                    return float('inf')  # Infinity for unlimited
+                    
+                try:
+                    limit_value = float(re.search(r'([\d.]+)', allowance).group(1))
+                    return limit_value
+                except (AttributeError, ValueError):
+                    return None
             return None
             
         elif self._sensor_type == SENSOR_TYPE_DAYS_REMAINING:
-            # Calculate days remaining in billing cycle
-            if "billingDetails" in service and "cycleEndDate" in service["billingDetails"]:
+            # Extract from daysLeftInCurrentBillingCycleText 
+            if "daysLeftInCurrentBillingCycleText" in service:
+                days_text = service["daysLeftInCurrentBillingCycleText"]
                 try:
-                    end_date = datetime.strptime(service["billingDetails"]["cycleEndDate"], "%Y-%m-%d")
-                    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-                    days_remaining = (end_date - today).days
-                    return max(0, days_remaining)
-                except (ValueError, TypeError):
+                    days = int(re.search(r'(\d+)', days_text).group(1))
+                    return days
+                except (AttributeError, ValueError):
                     return None
             return None
             
         elif self._sensor_type == SENSOR_TYPE_PLAN_SPEED:
-            # Extract plan speed
-            if "serviceDetails" in service and "downloadSpeedMbps" in service["serviceDetails"]:
-                return service["serviceDetails"]["downloadSpeedMbps"]
+            # Extract from speed field (format like "1000/50")
+            if "speed" in service:
+                speed_text = service["speed"]
+                try:
+                    download_speed = int(speed_text.split("/")[0])
+                    return download_speed
+                except (ValueError, IndexError):
+                    return None
+            return None
+            
+        elif self._sensor_type == SENSOR_TYPE_EVENING_SPEED:
+            # Extract from eveningSpeed field (format like "811 Mbps")
+            if "eveningSpeed" in service:
+                speed_text = service["eveningSpeed"]
+                try:
+                    evening_speed = int(re.search(r'(\d+)', speed_text).group(1))
+                    return evening_speed
+                except (AttributeError, ValueError):
+                    return None
             return None
             
         elif self._sensor_type == SENSOR_TYPE_BILLING_CYCLE_START:
-            # Extract billing cycle start date
-            if "billingDetails" in service and "cycleStartDate" in service["billingDetails"]:
+            # For the next billing cycle start date
+            if "nextBillingCycleStart" in service:
+                date_text = service["nextBillingCycleStart"]
                 try:
-                    return service["billingDetails"]["cycleStartDate"]
-                except (ValueError, TypeError):
-                    return None
+                    # Convert "27 Apr 25" format to YYYY-MM-DD
+                    date_obj = datetime.strptime(date_text, "%d %b %y")
+                    return date_obj.strftime("%Y-%m-%d")
+                except ValueError:
+                    return date_text  # Return as-is if parsing fails
             return None
             
         elif self._sensor_type == SENSOR_TYPE_BILLING_CYCLE_END:
-            # Extract billing cycle end date
-            if "billingDetails" in service and "cycleEndDate" in service["billingDetails"]:
+            # For the current billing cycle end date
+            if "currentBillingCycleEnd" in service:
+                date_text = service["currentBillingCycleEnd"]
                 try:
-                    return service["billingDetails"]["cycleEndDate"]
-                except (ValueError, TypeError):
-                    return None
+                    # Convert "26 Apr 25" format to YYYY-MM-DD
+                    date_obj = datetime.strptime(date_text, "%d %b %y")
+                    return date_obj.strftime("%Y-%m-%d")
+                except ValueError:
+                    return date_text  # Return as-is if parsing fails
             return None
             
         return None
@@ -203,23 +292,34 @@ class SuperloopSensor(CoordinatorEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
         """Return additional information about the sensor."""
-        if not self.coordinator.data or "services" not in self.coordinator.data or not self.coordinator.data["services"]:
+        if not self.coordinator.data or not self.coordinator.data.get("broadband"):
             return {}
             
-        service = self.coordinator.data["services"][0]
+        service = self.coordinator.data["broadband"][0]
         
         attributes = {}
         
-        # Add relevant attributes based on the sensor type
+        # Add common attributes for all sensors
+        attributes["service_number"] = service.get("serviceNumber")
+        attributes["address"] = service.get("address")
+        attributes["plan_title"] = service.get("planTitle")
+        attributes["plan_heading"] = service.get("planHeading")
+        attributes["monthly_charge"] = service.get("monthlyCharge")
+        
+        # Add specific attributes based on sensor type
         if self._sensor_type in [SENSOR_TYPE_DATA_USED, SENSOR_TYPE_DATA_REMAINING, SENSOR_TYPE_DATA_LIMIT]:
-            if "usage" in service:
-                attributes["last_updated"] = service["usage"].get("lastUpdated")
+            if "usageSummary" in service:
+                attributes["summary_text"] = service["usageSummary"].get("summaryText")
+                attributes["unlimited"] = service.get("isUnlimitedUsage", False)
                 
-        if "serviceDetails" in service:
-            attributes["service_id"] = service["serviceDetails"].get("serviceId")
-            attributes["service_type"] = service["serviceDetails"].get("serviceType")
+        if self._sensor_type in [SENSOR_TYPE_PLAN_SPEED, SENSOR_TYPE_EVENING_SPEED]:
+            attributes["speed"] = service.get("speed")
+            attributes["evening_speed"] = service.get("eveningSpeed")
+            attributes["plan_speed"] = service.get("planSpeed")
             
-        if "billingDetails" in service:
-            attributes["plan_name"] = service["billingDetails"].get("planName")
+        if self._sensor_type in [SENSOR_TYPE_BILLING_CYCLE_START, SENSOR_TYPE_BILLING_CYCLE_END, SENSOR_TYPE_DAYS_REMAINING]:
+            attributes["billing_cycle_progress"] = service.get("billingCycleProgressPercentage")
+            attributes["current_billing_cycle_end"] = service.get("currentBillingCycleEnd")
+            attributes["next_billing_cycle_start"] = service.get("nextBillingCycleStart")
             
         return attributes
