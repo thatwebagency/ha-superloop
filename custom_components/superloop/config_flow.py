@@ -1,226 +1,139 @@
-"""Config flow for Superloop integration."""
+import asyncio
 import logging
-import voluptuous as vol
 import aiohttp
-from typing import Any, Dict, Optional
+import async_timeout
+import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.core import callback
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.components.http import HomeAssistantView
-
-from .api import SuperloopClient, SuperloopApiError
-from .const import (
-    DOMAIN,
-    CONF_USERNAME,
-    CONF_PASSWORD,
-    CONF_ACCESS_TOKEN,
-    CONF_REFRESH_TOKEN,
-    AUTH_ERROR_INVALID_CREDENTIALS,
-    SUPERLOOP_LOGIN_URL,
-    AUTH_CALLBACK_PATH
-)
+from homeassistant.exceptions import HomeAssistantError
 
 _LOGGER = logging.getLogger(__name__)
 
+DOMAIN = "superloop"
+
+LOGIN_URL = "https://webservices.myexetel.exetel.com.au/api/auth/token"
+MFA_URL = "https://webservices-api.superloop.com/v1/mfa"
+CREATE_MFA_URL = "https://webservices-api.superloop.com/v1/create-mfa"
+VERIFY_MFA_URL = "https://webservices-api.superloop.com/v1/verify-mfa"
 
 class SuperloopConfigFlow(config_entries.ConfigFlow, domain="superloop"):
     """Handle a config flow for Superloop."""
 
     VERSION = 1
-    CONNECTION_CLASS = config_entries.CONN_CLASS_CLOUD_POLL
-
-    def __init__(self):
-        """Initialize."""
-        self._username = None
-        self._password = None
-        self._client = None
-        self._reauth_entry = None
-        self._auth_token = None
-        self._flow_id = None
 
     async def async_step_user(self, user_input=None):
-        """Handle the initial step."""
-        errors = {}
-
-        # Check if already configured
-        await self.async_set_unique_id(DOMAIN)
-        self._abort_if_unique_id_configured()
-
         if user_input is not None:
-            if "use_browser_auth" in user_input and user_input["use_browser_auth"]:
-                self._flow_id = self.flow_id
-                return await self.async_step_browser_auth()
-            
-            self._username = user_input[CONF_USERNAME]
-            self._password = user_input[CONF_PASSWORD]
-
-            session = async_get_clientsession(self.hass)
-            self._client = SuperloopClient(session=session)
+            self._email = user_input["email"]
+            self._password = user_input["password"]
 
             try:
-                # Attempt to authenticate with provided credentials
-                authenticated = await self._client.authenticate(self._username, self._password)
-                
-                if authenticated:
-                    # Authentication successful, create entry
-                    return self.async_create_entry(
-                        title=self._username,
-                        data={
-                            CONF_USERNAME: self._username,
-                            CONF_PASSWORD: self._password,
-                            CONF_ACCESS_TOKEN: self._client.get_access_token(),
-                            CONF_REFRESH_TOKEN: self._client.get_refresh_token()
-                        }
-                    )
-                else:
-                    errors["base"] = "invalid_auth"
-            except SuperloopApiError as error:
-                _LOGGER.exception("Error authenticating with Superloop API")
-                errors["base"] = "invalid_auth" if str(error) == AUTH_ERROR_INVALID_CREDENTIALS else "cannot_connect"
-            except Exception as error:
-                _LOGGER.exception(f"Unexpected error during Superloop authentication: {error}")
-                errors["base"] = "unknown"
+                # Step 1: Attempt login
+                self._access_token, self._refresh_token = await self._attempt_login(self._email, self._password)
+                # Step 2: Trigger SMS
+                await self._trigger_mfa_sms(self._access_token)
+            except InvalidAuth:
+                return self.async_show_form(
+                    step_id="user",
+                    errors={"base": "invalid_auth"},
+                )
+            except CannotConnect:
+                return self.async_show_form(
+                    step_id="user",
+                    errors={"base": "cannot_connect"},
+                )
 
-        # Show form with browser auth option
+            return await self.async_step_2fa()
+
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_USERNAME, default=self._username or ""): str,
-                    vol.Required(CONF_PASSWORD, default=""): str,
-                    vol.Optional("use_browser_auth", default=False): bool,
+                    vol.Required("email"): str,
+                    vol.Required("password"): str,
                 }
             ),
-            errors=errors,
-            description_placeholders={
-                "browser_auth_description": "Use browser for authentication (recommended)"
-            }
         )
 
-    async def async_step_browser_auth(self, user_input=None):
-        """Handle browser authentication step."""
-        if user_input is not None and "token" in user_input:
-            self._auth_token = user_input["token"]
-            return await self.async_step_two_factor()
-
-        # Register callback view
-        callback_view = SuperloopAuthCallbackView(self)
-        self.hass.http.register_view(callback_view)
-
-        # Generate external URL for browser login
-        return self.async_external_step(
-            step_id="browser_auth",
-            url=SUPERLOOP_LOGIN_URL
-        )
-
-    async def async_external_step_done(self, user_input=None):
-        """Handle completion of external step."""
-        if not self._auth_token:
-            return self.async_abort(reason="no_auth_token")
-        
-        return await self.async_step_two_factor()
-
-    async def async_step_two_factor(self, user_input=None):
-        """Handle two-factor authentication step."""
-        errors = {}
-
+    async def async_step_2fa(self, user_input=None):
         if user_input is not None:
-            session = async_get_clientsession(self.hass)
-            self._client = SuperloopClient(session=session)
-            
-            try:
-                # Set the auth token from the browser auth
-                await self._client.set_browser_auth_token(self._auth_token)
-                
-                # Verify 2FA code
-                verified = await self._client.verify_2fa(self._auth_token, user_input["verification_code"])
-                
-                if verified:
-                    # 2FA successful, get the tokens and create entry
-                    return self.async_create_entry(
-                        title="Superloop Account",
-                        data={
-                            CONF_ACCESS_TOKEN: self._client.get_access_token(),
-                            CONF_REFRESH_TOKEN: self._client.get_refresh_token()
-                        }
-                    )
-                else:
-                    errors["base"] = "invalid_verification_code"
-            except SuperloopApiError as error:
-                _LOGGER.exception(f"Error verifying 2FA code: {error}")
-                errors["base"] = "verification_failed"
-            except Exception as error:
-                _LOGGER.exception(f"Unexpected error during 2FA verification: {error}")
-                errors["base"] = "unknown"
+            code = user_input["code"]
 
-        # Show form for 2FA code entry
+            try:
+                await self._verify_2fa_code(self._access_token, code)
+            except InvalidAuth:
+                return self.async_show_form(
+                    step_id="2fa",
+                    errors={"base": "invalid_2fa"},
+                )
+
+            # Success! Save token
+            return self.async_create_entry(
+                title=self._email,
+                data={
+                    "access_token": self._access_token,
+                    "refresh_token": self._refresh_token,
+                },
+            )
+
         return self.async_show_form(
-            step_id="two_factor",
+            step_id="2fa",
             data_schema=vol.Schema(
                 {
-                    vol.Required("verification_code"): str,
+                    vol.Required("code"): str,
                 }
             ),
-            errors=errors,
-            description_placeholders={
-                "instruction": "Enter the verification code sent to your device."
-            }
         )
 
-    async def async_step_reauth(self, user_input=None):
-        """Handle reauth when tokens are no longer valid."""
-        self._reauth_entry = self.hass.config_entries.async_get_entry(
-            self.context["entry_id"]
-        )
-        return await self.async_step_user()
+    async def _attempt_login(self, email: str, password: str):
+        """Send login request and return tokens."""
+        payload = {
+            "username": email,
+            "password": password,
+            "persistLogin": True,
+            "brand": "superloop",
+        }
 
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with async_timeout.timeout(10):
+                    response = await session.post(LOGIN_URL, json=payload)
+                    if response.status != 200:
+                        raise InvalidAuth()
 
-class SuperloopOptionsFlowHandler(config_entries.OptionsFlow):
-    """Handle Superloop options."""
+                    data = await response.json()
+                    return data["access_token"], data["refresh_token"]
+        except asyncio.TimeoutError as ex:
+            raise CannotConnect() from ex
 
-    def __init__(self, config_entry):
-        """Initialize options flow."""
-        self.config_entry = config_entry
+    async def _trigger_mfa_sms(self, access_token: str):
+        """Trigger SMS MFA after login."""
+        headers = {"Authorization": f"Bearer {access_token}"}
 
-    async def async_step_init(self, user_input=None):
-        """Manage options."""
-        if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with async_timeout.timeout(10):
+                    await session.get(MFA_URL, headers=headers)
+                    await session.post(CREATE_MFA_URL, json={"action": "MfaOverSMS"}, headers=headers)
+        except asyncio.TimeoutError as ex:
+            raise CannotConnect() from ex
 
-        return self.async_show_form(
-            step_id="init",
-            data_schema=vol.Schema({})
-        )
+    async def _verify_2fa_code(self, access_token: str, code: str):
+        """Verify the entered 2FA code."""
+        headers = {"Authorization": f"Bearer {access_token}"}
+        payload = {"action": "MfaOverSMS", "token": code}
 
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with async_timeout.timeout(10):
+                    response = await session.post(VERIFY_MFA_URL, json=payload, headers=headers)
+                    if response.status != 200:
+                        raise InvalidAuth()
+        except asyncio.TimeoutError as ex:
+            raise CannotConnect() from ex
 
-class SuperloopAuthCallbackView(HomeAssistantView):
-    """Superloop Authorization Callback View."""
+class CannotConnect(HomeAssistantError):
+    """Error to indicate we cannot connect."""
 
-    requires_auth = False
-    url = AUTH_CALLBACK_PATH
-    name = "api:superloop:auth-callback"
-
-    def __init__(self, config_flow):
-        """Initialize."""
-        self.config_flow = config_flow
-
-    async def get(self, request):
-        """Handle callback from Superloop auth."""
-        hass = request.app["hass"]
-        
-        # Extract token from request
-        token = request.query.get("token")
-        if token:
-            await hass.config_entries.flow.async_configure(
-                flow_id=self.config_flow.flow_id, user_input={"token": token}
-            )
-            return aiohttp.web.Response(
-                status=200,
-                text="Authentication successful! You can close this window and return to Home Assistant."
-            )
-        
-        return aiohttp.web.Response(
-            status=400,
-            text="No authentication token found. Please try again."
-        )
+class InvalidAuth(HomeAssistantError):
+    """Error to indicate invalid authentication."""
