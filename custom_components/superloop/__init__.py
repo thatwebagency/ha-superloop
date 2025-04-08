@@ -17,7 +17,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     access_token = entry.data["access_token"]
     refresh_token = entry.data["refresh_token"]
 
-    client = SuperloopClient(access_token, refresh_token)
+    client = SuperloopClient(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        hass=hass,
+        entry=entry,
+    )
+
     coordinator = SuperloopCoordinator(hass, client, update_interval_minutes=15)
 
     try:
@@ -30,9 +36,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data[DOMAIN] = {}
 
     hass.data[DOMAIN][entry.entry_id] = coordinator
-    
 
     return True
+
+
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
