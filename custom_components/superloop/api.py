@@ -24,7 +24,11 @@ class SuperloopClient:
 
     async def async_get_services(self):
         """Fetch user services from Superloop."""
-        headers = {"Authorization": f"Bearer {self._access_token}"}
+        headers = {
+            "Authorization": f"Bearer {self._access_token}",
+            "Origin": "https://superhub.superloop.com",
+            "Referer": "https://superhub.superloop.com",
+        }
 
         try:
             async with async_timeout.timeout(10):
