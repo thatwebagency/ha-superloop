@@ -1,0 +1,94 @@
+title: Superloop Dashboard
+path: superloop
+icon: mdi:network
+cards:
+  - type: horizontal-stack
+    cards:
+      - type: custom:mini-graph-card
+        name: Download Usage
+        icon: mdi:download
+        entities:
+          - entity: sensor.superloop_total_usage
+        show:
+          name: true
+          icon: true
+          state: true
+          graph: line
+          labels: false
+        line_width: 5
+        font_size: 80
+        smoothing: true
+        height: 150
+        color_thresholds:
+          - value: 0
+            color: "#00d0ff"
+        style: |
+          ha-card {
+            background: rgba(20, 20, 20, 0.9);
+            border-radius: 16px;
+          }
+      - type: custom:mini-graph-card
+        name: Billing Progress
+        icon: mdi:calendar-clock
+        entities:
+          - entity: sensor.superloop_billing_progress
+        show:
+          name: true
+          icon: true
+          state: true
+          graph: line
+          labels: false
+        line_width: 5
+        font_size: 80
+        smoothing: true
+        height: 150
+        color_thresholds:
+          - value: 0
+            color: "#ff00c8"
+        style: |
+          ha-card {
+            background: rgba(20, 20, 20, 0.9);
+            border-radius: 16px;
+          }
+
+  - type: custom:mini-graph-card
+    name: Evening Speed
+    icon: mdi:speedometer
+    entities:
+      - entity: sensor.superloop_evening_speed
+    show:
+      name: true
+      icon: true
+      state: true
+      graph: line
+      labels: false
+    line_width: 5
+    font_size: 80
+    smoothing: true
+    height: 150
+    color_thresholds:
+      - value: 0
+        color: "#00ff88"
+    style: |
+      ha-card {
+        background: rgba(20, 20, 20, 0.9);
+        border-radius: 16px;
+      }
+
+  - type: custom:mini-graph-card
+    name: Plan Name
+    icon: mdi:file-document-edit
+    entities:
+      - entity: sensor.superloop_plan_name
+    show:
+      name: true
+      icon: true
+      state: true
+      graph: none
+    font_size: 100
+    height: 100
+    style: |
+      ha-card {
+        background: rgba(20, 20, 20, 0.9);
+        border-radius: 16px;
+      }

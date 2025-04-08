@@ -41,3 +41,16 @@ If you encounter any issues:
 
 ## Support
 For support, please open an issue on GitHub.
+
+## Dashboard Setup
+We recommend installing mini-graph-card via HACS for a beautiful Superloop usage graph!
+
+Example:
+
+type: custom:mini-graph-card
+entities:
+  - entity: sensor.superloop_total_usage
+  - entity: sensor.superloop_billing_progress
+name: Superloop Usage
+line_width: 5
+smoothing: true
