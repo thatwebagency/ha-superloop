@@ -24,7 +24,7 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
-class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class SuperloopConfigFlow(config_entries.ConfigFlow, domain="superloop"):
     """Handle a config flow for Superloop."""
 
     VERSION = 1
