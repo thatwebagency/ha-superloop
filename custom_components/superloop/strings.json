@@ -1,32 +1,41 @@
 {
-    "title": "Superloop",
-    "config": {
-      "step": {
-        "user": {
-          "title": "Connect to Superloop",
-          "description": "Set up Superloop integration to view your data usage details",
-          "data": {
-            "username": "Email Address",
-            "password": "Password"
-          }
-        },
-        "two_factor": {
-          "title": "Two-Factor Authentication",
-          "description": "Enter the verification code sent to your device",
-          "data": {
-            "two_factor_code": "Verification Code"
-          }
+  "title": "Superloop",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Superloop",
+        "description": "Set up Superloop integration to view your data usage details",
+        "data": {
+          "username": "Email Address",
+          "password": "Password",
+          "use_browser_auth": "Use browser for authentication"
         }
       },
-      "error": {
-        "cannot_connect": "Failed to connect to Superloop. Please try again.",
-        "invalid_auth": "Invalid username or password",
-        "invalid_2fa": "Invalid verification code",
-        "unknown": "Unexpected error occurred"
+      "browser_auth": {
+        "title": "Browser Authentication",
+        "description": "Click below to sign in to your Superloop account",
+        "data": {}
       },
-      "abort": {
-        "already_configured": "This Superloop account is already configured",
-        "reauth_successful": "Re-authentication was successful"
+      "two_factor": {
+        "title": "Two-Factor Authentication",
+        "description": "Enter the verification code sent to your device",
+        "data": {
+          "verification_code": "Verification Code"
+        }
       }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to Superloop. Please try again.",
+      "invalid_auth": "Invalid username or password",
+      "invalid_verification_code": "Invalid verification code",
+      "verification_failed": "Verification failed",
+      "no_auth_token": "No authentication token received",
+      "unknown": "Unexpected error occurred"
+    },
+    "abort": {
+      "already_configured": "This Superloop account is already configured",
+      "reauth_successful": "Re-authentication was successful",
+      "auth_failed": "Authentication failed"
     }
   }
+}

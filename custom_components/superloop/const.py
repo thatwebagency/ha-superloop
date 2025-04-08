@@ -7,6 +7,7 @@ PLATFORMS = ["sensor"]
 API_BASE_URL = "https://webservices.myexetel.exetel.com.au/api"
 API_GET_SERVICES_ENDPOINT = "/getServices"
 API_AUTH_TOKEN_ENDPOINT = "/auth/token"
+API_VERIFY_2FA_ENDPOINT = "/auth/verify2fa"  # New endpoint for 2FA verification
 
 # Authentication Constants
 AUTH_BRAND = "superloop"

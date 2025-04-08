@@ -1,94 +1,111 @@
 {
-    "config": {
-      "step": {
-        "user": {
-          "title": "Superloop Account",
-          "description": "Enter your Superloop account credentials",
-          "data": {
-            "email": "Email",
-            "password": "Password"
-          }
-        },
-        "reauth_confirm": {
-          "title": "Superloop Re-authentication",
-          "description": "Please re-enter your Superloop credentials",
-          "data": {
-            "email": "Email",
-            "password": "Password"
-          }
+  "config": {
+    "step": {
+      "user": {
+        "title": "Superloop Account",
+        "description": "Enter your Superloop account credentials or use browser authentication",
+        "data": {
+          "email": "Email",
+          "password": "Password",
+          "use_browser_auth": "Use browser for authentication"
         }
       },
-      "error": {
-        "cannot_connect": "Failed to connect to Superloop API",
-        "invalid_auth": "Invalid email or password",
-        "unknown": "Unexpected error occurred"
+      "browser_auth": {
+        "title": "Browser Authentication",
+        "description": "Click the button below to open Superloop's login page. After you sign in, you'll be redirected back to Home Assistant automatically."
       },
-      "abort": {
-        "already_configured": "Account is already configured",
-        "reauth_successful": "Re-authentication was successful"
+      "two_factor": {
+        "title": "Two-Factor Authentication",
+        "description": "Enter the verification code sent to your device.",
+        "data": {
+          "verification_code": "Verification Code"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Superloop Re-authentication",
+        "description": "Please re-enter your Superloop credentials",
+        "data": {
+          "email": "Email",
+          "password": "Password",
+          "use_browser_auth": "Use browser for authentication"
+        }
       }
     },
-    "entity": {
-      "sensor": {
-        "data_used": {
-          "name": "Data Used",
-          "state_attributes": {
-            "last_updated": "Last Updated",
-            "service_id": "Service ID",
-            "service_type": "Service Type",
-            "plan_name": "Plan Name"
-          }
-        },
-        "data_remaining": {
-          "name": "Data Remaining",
-          "state_attributes": {
-            "last_updated": "Last Updated",
-            "service_id": "Service ID",
-            "service_type": "Service Type",
-            "plan_name": "Plan Name"
-          }
-        },
-        "data_limit": {
-          "name": "Data Limit",
-          "state_attributes": {
-            "last_updated": "Last Updated",
-            "service_id": "Service ID",
-            "service_type": "Service Type",
-            "plan_name": "Plan Name"
-          }
-        },
-        "days_remaining": {
-          "name": "Days Remaining",
-          "state_attributes": {
-            "service_id": "Service ID",
-            "service_type": "Service Type",
-            "plan_name": "Plan Name"
-          }
-        },
-        "plan_speed": {
-          "name": "Plan Speed",
-          "state_attributes": {
-            "service_id": "Service ID",
-            "service_type": "Service Type",
-            "plan_name": "Plan Name"
-          }
-        },
-        "billing_cycle_start": {
-          "name": "Billing Cycle Start",
-          "state_attributes": {
-            "service_id": "Service ID",
-            "service_type": "Service Type",
-            "plan_name": "Plan Name"
-          }
-        },
-        "billing_cycle_end": {
-          "name": "Billing Cycle End",
-          "state_attributes": {
-            "service_id": "Service ID",
-            "service_type": "Service Type",
-            "plan_name": "Plan Name"
-          }
+    "error": {
+      "cannot_connect": "Failed to connect to Superloop API",
+      "invalid_auth": "Invalid email or password",
+      "unknown": "Unexpected error occurred",
+      "invalid_verification_code": "Invalid verification code",
+      "verification_failed": "Verification failed",
+      "no_auth_token": "No authentication token received"
+    },
+    "abort": {
+      "already_configured": "Account is already configured",
+      "reauth_successful": "Re-authentication was successful",
+      "auth_failed": "Authentication failed"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "data_used": {
+        "name": "Data Used",
+        "state_attributes": {
+          "last_updated": "Last Updated",
+          "service_id": "Service ID",
+          "service_type": "Service Type",
+          "plan_name": "Plan Name"
+        }
+      },
+      "data_remaining": {
+        "name": "Data Remaining",
+        "state_attributes": {
+          "last_updated": "Last Updated",
+          "service_id": "Service ID",
+          "service_type": "Service Type",
+          "plan_name": "Plan Name"
+        }
+      },
+      "data_limit": {
+        "name": "Data Limit",
+        "state_attributes": {
+          "last_updated": "Last Updated",
+          "service_id": "Service ID",
+          "service_type": "Service Type",
+          "plan_name": "Plan Name"
+        }
+      },
+      "days_remaining": {
+        "name": "Days Remaining",
+        "state_attributes": {
+          "service_id": "Service ID",
+          "service_type": "Service Type",
+          "plan_name": "Plan Name"
+        }
+      },
+      "plan_speed": {
+        "name": "Plan Speed",
+        "state_attributes": {
+          "service_id": "Service ID",
+          "service_type": "Service Type",
+          "plan_name": "Plan Name"
+        }
+      },
+      "billing_cycle_start": {
+        "name": "Billing Cycle Start",
+        "state_attributes": {
+          "service_id": "Service ID",
+          "service_type": "Service Type",
+          "plan_name": "Plan Name"
+        }
+      },
+      "billing_cycle_end": {
+        "name": "Billing Cycle End",
+        "state_attributes": {
+          "service_id": "Service ID",
+          "service_type": "Service Type",
+          "plan_name": "Plan Name"
         }
       }
     }
   }
+}
