@@ -17,10 +17,17 @@ MFA_URL = "https://webservices-api.superloop.com/v1/mfa"
 CREATE_MFA_URL = "https://webservices-api.superloop.com/v1/create-mfa"
 VERIFY_MFA_URL = "https://webservices-api.superloop.com/v1/verify-mfa"
 
-class SuperloopConfigFlow(config_entries.ConfigFlow, domain="superloop"):
+class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Superloop."""
 
     VERSION = 1
+
+    def __init__(self):
+        self._reauth_entry = None
+        self._email = None
+        self._password = None
+        self._access_token = None
+        self._refresh_token = None
 
     async def async_step_user(self, user_input=None):
         if user_input is not None:
@@ -28,9 +35,7 @@ class SuperloopConfigFlow(config_entries.ConfigFlow, domain="superloop"):
             self._password = user_input["password"]
 
             try:
-                # Step 1: Attempt login
                 self._access_token, self._refresh_token = await self._attempt_login(self._email, self._password)
-                # Step 2: Trigger SMS
                 await self._trigger_mfa_sms(self._access_token)
             except InvalidAuth:
                 return self.async_show_form(
@@ -67,7 +72,19 @@ class SuperloopConfigFlow(config_entries.ConfigFlow, domain="superloop"):
                     errors={"base": "invalid_2fa"},
                 )
 
-            # Success! Save token
+            if self._reauth_entry:
+                # Reauth flow
+                self.hass.config_entries.async_update_entry(
+                    self._reauth_entry,
+                    data={
+                        "access_token": self._access_token,
+                        "refresh_token": self._refresh_token,
+                    },
+                )
+                await self.hass.config_entries.async_reload(self._reauth_entry.entry_id)
+                return self.async_abort(reason="reauth_successful")
+
+            # Normal new flow
             return self.async_create_entry(
                 title=self._email,
                 data={
@@ -84,6 +101,14 @@ class SuperloopConfigFlow(config_entries.ConfigFlow, domain="superloop"):
                 }
             ),
         )
+
+    async def async_step_reauth(self, entry_data):
+        """Handle a reauthentication flow."""
+        _LOGGER.debug("Starting Superloop reauthentication flow")
+        self._reauth_entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
+        self._email = self._reauth_entry.title  # preload email if possible
+
+        return await self.async_step_user()
 
     async def _attempt_login(self, email: str, password: str):
         """Send login request and return tokens."""

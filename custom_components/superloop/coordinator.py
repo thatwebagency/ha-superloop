@@ -11,7 +11,7 @@ class SuperloopCoordinator(DataUpdateCoordinator):
     """Coordinator to manage fetching Superloop service data."""
 
     def __init__(self, hass, client: SuperloopClient, update_interval_minutes: int = 15):
-        """Initialize the coordinator."""
+        """Initialize the Superloop Coordinator."""
         super().__init__(
             hass,
             _LOGGER,
@@ -21,8 +21,14 @@ class SuperloopCoordinator(DataUpdateCoordinator):
         self.client = client
 
     async def _async_update_data(self):
-        """Fetch the latest service data from Superloop."""
+        """Fetch data from Superloop API."""
+        _LOGGER.debug("Fetching latest Superloop service data...")
+
         try:
-            return await self.client.async_get_services()
+            data = await self.client.async_get_services()
+            _LOGGER.debug("Successfully fetched Superloop service data: %s", data)
+            return data
+
         except Exception as err:
-            raise UpdateFailed(f"Error fetching data: {err}") from err
+            _LOGGER.error("Failed to update Superloop data: %s", err)
+            raise UpdateFailed(f"Error fetching Superloop data: {err}") from err
