@@ -23,30 +23,30 @@ class SuperloopClient:
         await self._session.close()
 
     async def async_get_services(self):
-    """Fetch user services from Superloop."""
-    headers = {"Authorization": f"Bearer {self._access_token}"}
+        """Fetch user services from Superloop."""
+        headers = {"Authorization": f"Bearer {self._access_token}"}
 
-    try:
-        async with async_timeout.timeout(10):
-            response = await self._session.get(f"{BASE_API_URL}/getServices/", headers=headers)
-            _LOGGER.debug("Superloop API getServices status: %s", response.status)
-            data = await response.json()
-            _LOGGER.debug("Superloop API getServices response: %s", data)
+        try:
+            async with async_timeout.timeout(10):
+                response = await self._session.get(f"{BASE_API_URL}/getServices/", headers=headers)
+                _LOGGER.debug("Superloop API getServices status: %s", response.status)
+                data = await response.json()
+                _LOGGER.debug("Superloop API getServices response: %s", data)
 
-            if response.status == 401:
-                _LOGGER.warning("Access token expired, refreshing...")
-                await self.async_refresh_token()
-                return await self.async_get_services()
+                if response.status == 401:
+                    _LOGGER.warning("Access token expired, refreshing...")
+                    await self.async_refresh_token()
+                    return await self.async_get_services()
 
-            if response.status != 200:
-                _LOGGER.error("Failed to fetch services: %s", response.status)
-                raise SuperloopApiError("Failed to fetch services")
+                if response.status != 200:
+                    _LOGGER.error("Failed to fetch services: %s", response.status)
+                    raise SuperloopApiError("Failed to fetch services")
 
-            return data
+                return data
 
-    except asyncio.TimeoutError as ex:
-        _LOGGER.error("Timeout fetching services")
-        raise SuperloopApiError("Timeout fetching services") from ex
+        except asyncio.TimeoutError as ex:
+            _LOGGER.error("Timeout fetching services")
+            raise SuperloopApiError("Timeout fetching services") from ex
 
 
     async def async_refresh_token(self):
