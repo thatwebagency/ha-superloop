@@ -2,14 +2,12 @@
 import logging
 import voluptuous as vol
 from typing import Any, Dict, Optional
-import secrets
 import aiohttp
 from urllib.parse import urlencode
 
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.data_entry_flow import FlowResult
 from homeassistant.components.http import HomeAssistantView
 
 from .api import SuperloopClient, SuperloopApiError
@@ -113,7 +111,7 @@ class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Error authenticating with Superloop API")
                 errors["base"] = "invalid_auth" if str(error) == AUTH_ERROR_INVALID_CREDENTIALS else "cannot_connect"
             except Exception as error:
-                _LOGGER.exception("Unexpected error during Superloop authentication")
+                _LOGGER.exception(f"Unexpected error during Superloop authentication: {error}")
                 errors["base"] = "unknown"
 
         # Show form with browser auth option
@@ -139,22 +137,17 @@ class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return await self.async_step_two_factor()
 
         # Register callback view
-        callback_view = SuperloopAuthCallbackView(self)
-        self.hass.http.register_view(callback_view)
+        self.hass.http.register_view(SuperloopAuthCallbackView(self))
 
         # Generate external URL for browser login
         callback_url = f"{self.hass.config.external_url}{AUTH_CALLBACK_PATH}"
         
         return self.async_external_step(
             step_id="browser_auth",
-            url=SUPERLOOP_LOGIN_URL,
-            description_placeholders={
-                "login_url": SUPERLOOP_LOGIN_URL,
-                "callback_hint": "Once logged in, the Superloop website will redirect you back to Home Assistant."
-            }
+            url=SUPERLOOP_LOGIN_URL
         )
 
-    async def async_step_external_step_done(self, user_input=None):
+    async def async_external_step_done(self, user_input=None):
         """Handle completion of external step."""
         if not self._auth_token:
             return self.async_abort(reason="no_auth_token")
@@ -170,6 +163,9 @@ class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._client = SuperloopClient(session=session)
             
             try:
+                # Set the auth token from the browser auth
+                await self._client.set_browser_auth_token(self._auth_token)
+                
                 # Verify 2FA code
                 verified = await self._client.verify_2fa(self._auth_token, user_input["verification_code"])
                 
@@ -185,10 +181,10 @@ class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 else:
                     errors["base"] = "invalid_verification_code"
             except SuperloopApiError as error:
-                _LOGGER.exception("Error verifying 2FA code")
+                _LOGGER.exception(f"Error verifying 2FA code: {error}")
                 errors["base"] = "verification_failed"
             except Exception as error:
-                _LOGGER.exception("Unexpected error during 2FA verification")
+                _LOGGER.exception(f"Unexpected error during 2FA verification: {error}")
                 errors["base"] = "unknown"
 
         # Show form for 2FA code entry

@@ -81,50 +81,50 @@ class SuperloopClient:
             raise SuperloopApiError(f"Unexpected error: {e}")
     
     async def set_browser_auth_token(self, token: str) -> bool:
-        """Set the token received from browser-based authentication."""
-        _LOGGER.debug("Setting browser auth token")
-        self._access_token = token
-        # At this point, the token is only valid for 2FA verification
-        # Full access/refresh tokens will be received after 2FA
-        return True
-    
-    async def verify_2fa(self, token: str, verification_code: str) -> bool:
-        """Verify 2FA code and obtain access/refresh tokens."""
-        try:
-            _LOGGER.debug("Verifying 2FA code")
+    """Set the token received from browser-based authentication."""
+    _LOGGER.debug("Setting browser auth token")
+    self._access_token = token
+    # At this point, the token is only valid for 2FA verification
+    # Full access/refresh tokens will be received after 2FA
+    return True
+
+async def verify_2fa(self, token: str, verification_code: str) -> bool:
+    """Verify 2FA code and obtain access/refresh tokens."""
+    try:
+        _LOGGER.debug("Verifying 2FA code")
+        
+        verify_data = {
+            "token": token,
+            "code": verification_code,
+            "persistLogin": AUTH_PERSIST_LOGIN,
+            "brand": AUTH_BRAND
+        }
+        
+        with async_timeout.timeout(30):
+            response = await self._session.post(
+                f"{API_BASE_URL}{API_VERIFY_2FA_ENDPOINT}",
+                json=verify_data
+            )
             
-            verify_data = {
-                "token": token,
-                "code": verification_code,
-                "persistLogin": AUTH_PERSIST_LOGIN,
-                "brand": AUTH_BRAND
-            }
+            _LOGGER.debug(f"2FA verification response status: {response.status}")
             
-            with async_timeout.timeout(30):
-                response = await self._session.post(
-                    f"{API_BASE_URL}{API_VERIFY_2FA_ENDPOINT}",
-                    json=verify_data
-                )
-                
-                _LOGGER.debug(f"2FA verification response status: {response.status}")
-                
-                if response.status != 200:
-                    response_text = await response.text()
-                    _LOGGER.error(f"2FA verification failed: {response.status}, {response_text}")
-                    return False
-                
-                data = await response.json()
-                self._access_token = data.get("access_token")
-                self._refresh_token = data.get("refresh_token")
-                
-                return bool(self._access_token and self._refresh_token)
-                
-        except (aiohttp.ClientError, asyncio.TimeoutError) as error:
-            _LOGGER.error(f"Error during 2FA verification: {error}")
-            raise SuperloopApiError(f"Error communicating with Superloop API: {error}")
-        except Exception as e:
-            _LOGGER.exception(f"Unexpected exception during 2FA verification: {e}")
-            raise SuperloopApiError(f"Unexpected error: {e}")
+            if response.status != 200:
+                response_text = await response.text()
+                _LOGGER.error(f"2FA verification failed: {response.status}, {response_text}")
+                return False
+            
+            data = await response.json()
+            self._access_token = data.get("access_token")
+            self._refresh_token = data.get("refresh_token")
+            
+            return bool(self._access_token and self._refresh_token)
+            
+    except (aiohttp.ClientError, asyncio.TimeoutError) as error:
+        _LOGGER.error(f"Error during 2FA verification: {error}")
+        raise SuperloopApiError(f"Error communicating with Superloop API: {error}")
+    except Exception as e:
+        _LOGGER.exception(f"Unexpected exception during 2FA verification: {e}")
+        raise SuperloopApiError(f"Unexpected error: {e}")
     
     def get_access_token(self) -> str:
         """Get the current access token."""

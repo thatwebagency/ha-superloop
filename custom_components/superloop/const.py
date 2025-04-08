@@ -11,7 +11,7 @@ API_VERIFY_2FA_ENDPOINT = "/auth/verify2fa"  # New endpoint for 2FA verification
 
 # Authentication Constants
 AUTH_BRAND = "superloop"
-AUTH_PERSIST_LOGIN = False
+AUTH_PERSIST_LOGIN = True
 
 # OAuth Config
 SUPERLOOP_LOGIN_URL = "https://superhub.superloop.com/login"
