@@ -4,7 +4,7 @@ import asyncio
 from typing import Dict, Any, Optional
 
 import aiohttp
-from async_timeout import async_timeout
+import async_timeout
 
 from .const import (
     API_BASE_URL,
