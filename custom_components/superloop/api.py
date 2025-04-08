@@ -84,8 +84,6 @@ class SuperloopClient:
     """Set the token received from browser-based authentication."""
     _LOGGER.debug("Setting browser auth token")
     self._access_token = token
-    # At this point, the token is only valid for 2FA verification
-    # Full access/refresh tokens will be received after 2FA
     return True
 
 async def verify_2fa(self, token: str, verification_code: str) -> bool:

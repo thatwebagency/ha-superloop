@@ -1,12 +1,11 @@
 """Config flow for Superloop integration."""
 import logging
 import voluptuous as vol
-from typing import Any, Dict, Optional
 import aiohttp
-from urllib.parse import urlencode
+from typing import Any, Dict, Optional
 
 from homeassistant import config_entries
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.components.http import HomeAssistantView
 
@@ -23,37 +22,6 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
-
-class SuperloopAuthCallbackView(HomeAssistantView):
-    """Superloop Authorization Callback View."""
-
-    requires_auth = False
-    url = AUTH_CALLBACK_PATH
-    name = "api:superloop:auth-callback"
-
-    def __init__(self, config_flow):
-        """Initialize."""
-        self.config_flow = config_flow
-
-    async def get(self, request):
-        """Handle callback from Superloop auth."""
-        hass = request.app["hass"]
-        
-        # Extract token from request
-        token = request.query.get("token")
-        if token:
-            await hass.config_entries.flow.async_configure(
-                flow_id=self.config_flow.flow_id, user_input={"token": token}
-            )
-            return aiohttp.web.Response(
-                status=200,
-                text="Authentication successful! You can close this window and return to Home Assistant."
-            )
-        
-        return aiohttp.web.Response(
-            status=400,
-            text="No authentication token found. Please try again."
-        )
 
 
 class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -137,11 +105,10 @@ class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return await self.async_step_two_factor()
 
         # Register callback view
-        self.hass.http.register_view(SuperloopAuthCallbackView(self))
+        callback_view = SuperloopAuthCallbackView(self)
+        self.hass.http.register_view(callback_view)
 
         # Generate external URL for browser login
-        callback_url = f"{self.hass.config.external_url}{AUTH_CALLBACK_PATH}"
-        
         return self.async_external_step(
             step_id="browser_auth",
             url=SUPERLOOP_LOGIN_URL
@@ -208,12 +175,6 @@ class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
         return await self.async_step_user()
 
-    @staticmethod
-    @callback
-    def async_get_options_flow(config_entry):
-        """Get the options flow for this handler."""
-        return SuperloopOptionsFlowHandler(config_entry)
-
 
 class SuperloopOptionsFlowHandler(config_entries.OptionsFlow):
     """Handle Superloop options."""
@@ -230,4 +191,36 @@ class SuperloopOptionsFlowHandler(config_entries.OptionsFlow):
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema({})
+        )
+
+
+class SuperloopAuthCallbackView(HomeAssistantView):
+    """Superloop Authorization Callback View."""
+
+    requires_auth = False
+    url = AUTH_CALLBACK_PATH
+    name = "api:superloop:auth-callback"
+
+    def __init__(self, config_flow):
+        """Initialize."""
+        self.config_flow = config_flow
+
+    async def get(self, request):
+        """Handle callback from Superloop auth."""
+        hass = request.app["hass"]
+        
+        # Extract token from request
+        token = request.query.get("token")
+        if token:
+            await hass.config_entries.flow.async_configure(
+                flow_id=self.config_flow.flow_id, user_input={"token": token}
+            )
+            return aiohttp.web.Response(
+                status=200,
+                text="Authentication successful! You can close this window and return to Home Assistant."
+            )
+        
+        return aiohttp.web.Response(
+            status=400,
+            text="No authentication token found. Please try again."
         )
