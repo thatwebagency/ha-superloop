@@ -81,10 +81,10 @@ class SuperloopClient:
             raise SuperloopApiError(f"Unexpected error: {e}")
     
     async def set_browser_auth_token(self, token: str) -> bool:
-    """Set the token received from browser-based authentication."""
-    _LOGGER.debug("Setting browser auth token")
-    self._access_token = token
-    return True
+        """Set the token received from browser-based authentication."""
+        _LOGGER.debug("Setting browser auth token")
+        self._access_token = token
+        return True
 
 async def verify_2fa(self, token: str, verification_code: str) -> bool:
     """Verify 2FA code and obtain access/refresh tokens."""
