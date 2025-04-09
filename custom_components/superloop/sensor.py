@@ -11,36 +11,140 @@ async def async_setup_entry(hass, entry, async_add_entities):
     for service in coordinator.data.get('broadband', []):
         service_number = service["serviceNumber"]
 
-        # Usage sensor (Data Usage in GB)
+        # Existing sensors
         sensors.append(
             SuperloopSensor(
                 coordinator=coordinator,
                 service=service,
                 description="Data Usage",
                 unique_id=f"superloop-{service_number}-usage",
-                unit_of_measurement=UnitOfInformation.GIGABYTES,  # ✅ Correct new way
+                unit_of_measurement=UnitOfInformation.GIGABYTES,
                 icon="mdi:download-network",
                 device_class="data_size",
                 state_class="total_increasing",
-                value_key="usageSummary.total"
+                value_key="usageSummary.totalBytes"
             )
         )
-
-        # Speed sensor (Download Speed in Mbps)
         sensors.append(
             SuperloopSensor(
                 coordinator=coordinator,
                 service=service,
                 description="Download Speed",
                 unique_id=f"superloop-{service_number}-speed",
-                unit_of_measurement=UnitOfDataRate.MEGABITS_PER_SECOND,  # ✅ Correct new way
+                unit_of_measurement=UnitOfDataRate.MEGABITS_PER_SECOND,
                 icon="mdi:speedometer",
                 device_class="speed",
-                value_key="eveningSpeedValue"
+                value_key="eveningSpeed"
+            )
+        )
+
+        # New sensors you requested:
+
+        # 1. Plan Name
+        sensors.append(
+            SuperloopSensor(
+                coordinator=coordinator,
+                service=service,
+                description="Plan Name",
+                unique_id=f"superloop-{service_number}-plan-title",
+                unit_of_measurement=None,
+                icon="mdi:label",
+                device_class=None,
+                value_key="planTitle"
+            )
+        )
+
+        # 2. Billing Progress (%)
+        sensors.append(
+            SuperloopSensor(
+                coordinator=coordinator,
+                service=service,
+                description="Billing Progress",
+                unique_id=f"superloop-{service_number}-billing-progress",
+                unit_of_measurement="%",
+                icon="mdi:calendar-clock",
+                device_class=None,
+                state_class="measurement",
+                value_key="billingCycleProgressPercentage"
+            )
+        )
+
+        # 3. Plan Evening Speed (again but as text version)
+        sensors.append(
+            SuperloopSensor(
+                coordinator=coordinator,
+                service=service,
+                description="Plan Evening Speed",
+                unique_id=f"superloop-{service_number}-evening-speed",
+                unit_of_measurement=UnitOfDataRate.MEGABITS_PER_SECOND,
+                icon="mdi:speedometer-medium",
+                device_class="speed",
+                value_key="eveningSpeed"
+            )
+        )
+
+        # 4. Free Download Usage (GB)
+        sensors.append(
+            SuperloopSensor(
+                coordinator=coordinator,
+                service=service,
+                description="Free Download Usage",
+                unique_id=f"superloop-{service_number}-free-download",
+                unit_of_measurement=UnitOfInformation.GIGABYTES,
+                icon="mdi:download",
+                device_class="data_size",
+                state_class="total_increasing",
+                value_key="freeDownload"
+            )
+        )
+
+        # 5. Download Usage (non-free)
+        sensors.append(
+            SuperloopSensor(
+                coordinator=coordinator,
+                service=service,
+                description="Download Usage",
+                unique_id=f"superloop-{service_number}-nonfree-download",
+                unit_of_measurement=UnitOfInformation.GIGABYTES,
+                icon="mdi:download-off",
+                device_class="data_size",
+                state_class="total_increasing",
+                value_key="nonFreeDownload"
+            )
+        )
+
+        # 6. Free Upload Usage
+        sensors.append(
+            SuperloopSensor(
+                coordinator=coordinator,
+                service=service,
+                description="Free Upload Usage",
+                unique_id=f"superloop-{service_number}-free-upload",
+                unit_of_measurement=UnitOfInformation.GIGABYTES,
+                icon="mdi:upload",
+                device_class="data_size",
+                state_class="total_increasing",
+                value_key="freeUpload"
+            )
+        )
+
+        # 7. Upload Usage (non-free)
+        sensors.append(
+            SuperloopSensor(
+                coordinator=coordinator,
+                service=service,
+                description="Upload Usage",
+                unique_id=f"superloop-{service_number}-nonfree-upload",
+                unit_of_measurement=UnitOfInformation.GIGABYTES,
+                icon="mdi:upload-off",
+                device_class="data_size",
+                state_class="total_increasing",
+                value_key="nonFreeUpload"
             )
         )
 
     async_add_entities(sensors, True)
+
 
 class SuperloopSensor(CoordinatorEntity, SensorEntity):
     """Representation of a Superloop Sensor."""
@@ -67,17 +171,34 @@ class SuperloopSensor(CoordinatorEntity, SensorEntity):
         if not current_service:
             return None
 
-        if self._value_key == "usageSummary.total":
-            # Convert from bytes to GB
-            return round(current_service.get("usageSummary", {}).get("totalBytes", 0) / (1024 ** 3), 2)
+        try:
+            # Nested keys (usageSummary etc)
+            if self._value_key.startswith("usageSummary."):
+                return round(current_service.get("usageSummary", {}).get(self._value_key.split(".")[1], 0) / (1024 ** 3), 2)
 
-        if self._value_key == "eveningSpeedValue":
-            try:
-                return int(current_service.get("eveningSpeed", "").split(" ")[0])
-            except Exception:
-                return None
+            # Evening Speed (string to number)
+            if self._value_key == "eveningSpeed":
+                speed_text = current_service.get("eveningSpeed", "")
+                return int(speed_text.split(" ")[0]) if speed_text else None
+
+            # Billing Progress %
+            if self._value_key == "billingCycleProgressPercentage":
+                return current_service.get("billingCycleProgressPercentage", None)
+
+            # Free/Non-Free Upload/Download
+            if self._value_key in ("freeDownload", "nonFreeDownload", "freeUpload", "nonFreeUpload"):
+                return round(current_service.get(self._value_key, 0) / (1024 ** 3), 2)
+
+            # Plan Title
+            if self._value_key == "planTitle":
+                return current_service.get("planTitle", None)
+
+        except Exception as e:
+            _LOGGER.error("Error parsing Superloop sensor value: %s", e)
+            return None
 
         return None
+
 
     @property
     def device_info(self):
