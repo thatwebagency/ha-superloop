@@ -31,7 +31,7 @@ condition:
       {% set allowance = states(allowance_sensor) %}
       {% if not usage or not allowance %}
         false
-      {% elif 'Unlimited' in allowance %}
+      {% elif 'Unlimited Data' in allowance %}
         false
       {% else %}
         {% set current = usage | float %}
