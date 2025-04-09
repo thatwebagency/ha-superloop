@@ -1,0 +1,46 @@
+blueprint:
+  name: Superloop Usage Alert
+  description: >
+    Sends a persistent notification when your Superloop data usage reaches 90% of your plan's allowance.
+    Skips plans with unlimited data.
+  domain: automation
+  input:
+    usage_sensor:
+      name: Data Usage Sensor
+      description: Select your Superloop Free Download Usage sensor.
+      selector:
+        entity:
+          domain: sensor
+
+trigger:
+  - platform: numeric_state
+    entity_id: !input usage_sensor
+    above: 0  # Placeholder; we'll use condition to check allowance manually
+
+condition:
+  - condition: template
+    value_template: >
+      {% set entity = states[usage_sensor] %}
+      {% if not entity %}
+        false
+      {% else %}
+        {% set allowance = state_attr(entity.entity_id, 'allowance') %}
+        {% set current = entity.state | float %}
+        {% if allowance is string and 'Unlimited' in allowance %}
+          false
+        {% elif allowance is number %}
+          current >= (allowance * 0.9)
+        {% else %}
+          false
+        {% endif %}
+      {% endif %}
+
+action:
+  - service: persistent_notification.create
+    data:
+      title: "Superloop Usage Warning"
+      message: >
+        Your data usage has reached 90% of your plan allowance!
+        Current usage: {{ states(usage_sensor) }} GB.
+
+mode: single
