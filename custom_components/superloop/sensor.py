@@ -33,7 +33,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 unique_id=f"superloop-{service_number}-speed",
                 unit_of_measurement=UnitOfDataRate.MEGABITS_PER_SECOND,
                 icon="mdi:speedometer",
-                device_class="speed",
+                device_class=None,
                 value_key="eveningSpeed"
             )
         )
@@ -78,7 +78,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 unique_id=f"superloop-{service_number}-evening-speed",
                 unit_of_measurement=UnitOfDataRate.MEGABITS_PER_SECOND,
                 icon="mdi:speedometer-medium",
-                device_class="speed",
+                device_class=None,
                 value_key="eveningSpeed"
             )
         )
@@ -172,24 +172,22 @@ class SuperloopSensor(CoordinatorEntity, SensorEntity):
             return None
 
         try:
-            # Nested keys (usageSummary etc)
-            if self._value_key.startswith("usageSummary."):
-                return round(current_service.get("usageSummary", {}).get(self._value_key.split(".")[1], 0) / (1024 ** 3), 2)
+            usage_summary = current_service.get("usageSummary", {})
 
-            # Evening Speed (string to number)
+            if self._value_key.startswith("usageSummary."):
+                key = self._value_key.split(".")[1]
+                return round(usage_summary.get(key, 0) / (1024 ** 3), 2)
+
+            if self._value_key in ("freeDownload", "nonFreeDownload", "freeUpload", "nonFreeUpload"):
+                return round(usage_summary.get(self._value_key, 0) / (1024 ** 3), 2)
+
             if self._value_key == "eveningSpeed":
                 speed_text = current_service.get("eveningSpeed", "")
                 return int(speed_text.split(" ")[0]) if speed_text else None
 
-            # Billing Progress %
             if self._value_key == "billingCycleProgressPercentage":
                 return current_service.get("billingCycleProgressPercentage", None)
 
-            # Free/Non-Free Upload/Download
-            if self._value_key in ("freeDownload", "nonFreeDownload", "freeUpload", "nonFreeUpload"):
-                return round(current_service.get(self._value_key, 0) / (1024 ** 3), 2)
-
-            # Plan Title
             if self._value_key == "planTitle":
                 return current_service.get("planTitle", None)
 
@@ -198,6 +196,7 @@ class SuperloopSensor(CoordinatorEntity, SensorEntity):
             return None
 
         return None
+
 
 
     @property
