@@ -10,6 +10,9 @@ _LOGGER = logging.getLogger(__name__)
 
 DOMAIN = "superloop"
 
+# ✅ Add this
+PLATFORMS = ["sensor"]
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Superloop from a config entry."""
     _LOGGER.debug("Setting up Superloop entry: %s", entry.entry_id)
@@ -37,10 +40,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
+    # ✅ Forward setup to sensor platform
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
     return True
-
-
-
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a Superloop config entry."""
@@ -49,7 +52,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator: SuperloopCoordinator = hass.data[DOMAIN].pop(entry.entry_id)
     await coordinator.client.async_close()
 
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
     if not hass.data[DOMAIN]:
         hass.data.pop(DOMAIN)
 
-    return True
+    return unload_ok
