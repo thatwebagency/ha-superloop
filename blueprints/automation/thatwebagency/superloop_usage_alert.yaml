@@ -7,7 +7,14 @@ blueprint:
   input:
     usage_sensor:
       name: Data Usage Sensor
-      description: Select your Superloop Free Download Usage sensor.
+      description: Select your Superloop Free Download Usage sensor (e.g., sensor.superloop_free_download_usage).
+      selector:
+        entity:
+          domain: sensor
+
+    allowance_sensor:
+      name: Plan Allowance Sensor
+      description: Select your Superloop Plan Allowance sensor (e.g., sensor.superloop_plan_allowance).
       selector:
         entity:
           domain: sensor
@@ -15,24 +22,21 @@ blueprint:
 trigger:
   - platform: numeric_state
     entity_id: !input usage_sensor
-    above: 0  # Placeholder; we'll use condition to check allowance manually
+    above: 0
 
 condition:
   - condition: template
     value_template: >
-      {% set entity = states[usage_sensor] %}
-      {% if not entity %}
+      {% set usage = states(usage_sensor) %}
+      {% set allowance = states(allowance_sensor) %}
+      {% if not usage or not allowance %}
+        false
+      {% elif 'Unlimited' in allowance %}
         false
       {% else %}
-        {% set allowance = state_attr(entity.entity_id, 'allowance') %}
-        {% set current = entity.state | float %}
-        {% if allowance is string and 'Unlimited' in allowance %}
-          false
-        {% elif allowance is number %}
-          current >= (allowance * 0.9)
-        {% else %}
-          false
-        {% endif %}
+        {% set current = usage | float %}
+        {% set limit = allowance.replace('GB', '') | float %}
+        {{ current >= (limit * 0.9) }}
       {% endif %}
 
 action:
@@ -41,6 +45,6 @@ action:
       title: "Superloop Usage Warning"
       message: >
         Your data usage has reached 90% of your plan allowance!
-        Current usage: {{ states(usage_sensor) }} GB.
+        Current usage: {{ states(usage_sensor) }} GB out of {{ states(allowance_sensor) }}.
 
 mode: single

@@ -45,7 +45,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
             SuperloopSensor(
                 coordinator=coordinator,
                 service=service,
-                description="Plan Name",
+                description="Plan",
                 unique_id=f"superloop-{service_number}-plan-title",
                 unit_of_measurement=None,
                 icon="mdi:label",
@@ -142,6 +142,20 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 value_key="nonFreeUpload"
             )
         )
+        
+        sensors.append(
+            SuperloopSensor(
+                coordinator=coordinator,
+                service=service,
+                description="Plan Allowance",
+                unique_id=f"superloop-{service_number}-plan-allowance",
+                unit_of_measurement=None,
+                icon="mdi:database",
+                device_class=None,
+                value_key="allowance"
+            )
+        )
+
 
     async_add_entities(sensors, True)
 
@@ -190,6 +204,9 @@ class SuperloopSensor(CoordinatorEntity, SensorEntity):
 
             if self._value_key == "planTitle":
                 return current_service.get("planTitle", None)
+
+            if self._value_key == "allowance":
+                return current_service.get("allowance", None)
 
         except Exception as e:
             _LOGGER.error("Error parsing Superloop sensor value: %s", e)
