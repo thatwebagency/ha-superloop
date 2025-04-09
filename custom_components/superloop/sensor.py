@@ -1,6 +1,6 @@
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.components.sensor import SensorEntity
-from homeassistant.const import DATA_RATE_MEGABITS_PER_SECOND, DATA_SIZE_GIGABYTES
+from homeassistant.const import UnitOfDataRate, UnitOfInformation
 
 from .const import DOMAIN
 
@@ -11,14 +11,14 @@ async def async_setup_entry(hass, entry, async_add_entities):
     for service in coordinator.data.get('broadband', []):
         service_number = service["serviceNumber"]
 
-        # Usage sensor
+        # Usage sensor (Data Usage in GB)
         sensors.append(
             SuperloopSensor(
                 coordinator=coordinator,
                 service=service,
                 description="Data Usage",
                 unique_id=f"superloop-{service_number}-usage",
-                unit_of_measurement=DATA_SIZE_GIGABYTES,
+                unit_of_measurement=UnitOfInformation.GIGABYTES,  # ✅ Correct new way
                 icon="mdi:download-network",
                 device_class="data_size",
                 state_class="total_increasing",
@@ -26,14 +26,14 @@ async def async_setup_entry(hass, entry, async_add_entities):
             )
         )
 
-        # Speed sensor
+        # Speed sensor (Download Speed in Mbps)
         sensors.append(
             SuperloopSensor(
                 coordinator=coordinator,
                 service=service,
                 description="Download Speed",
                 unique_id=f"superloop-{service_number}-speed",
-                unit_of_measurement=DATA_RATE_MEGABITS_PER_SECOND,
+                unit_of_measurement=UnitOfDataRate.MEGABITS_PER_SECOND,  # ✅ Correct new way
                 icon="mdi:speedometer",
                 device_class="speed",
                 value_key="eveningSpeedValue"
@@ -55,15 +55,12 @@ class SuperloopSensor(CoordinatorEntity, SensorEntity):
         self._attr_icon = icon
         self._attr_device_class = device_class
         self._attr_state_class = state_class
-        self._value_key = value_key  # key path to the data we want
+        self._value_key = value_key
 
     @property
     def native_value(self):
         """Return the current value based on the latest coordinator data."""
-        # Dynamically extract the correct value every time
         service_number = self._service["serviceNumber"]
-
-        # Get the latest broadband service data
         broadband_services = self.coordinator.data.get("broadband", [])
         current_service = next((s for s in broadband_services if s["serviceNumber"] == service_number), None)
 
@@ -71,7 +68,9 @@ class SuperloopSensor(CoordinatorEntity, SensorEntity):
             return None
 
         if self._value_key == "usageSummary.total":
-            return round(current_service.get("usageSummary", {}).get("totalBytes", 0) / (1024 ** 3), 2)  # Convert Bytes to GB
+            # Convert from bytes to GB
+            return round(current_service.get("usageSummary", {}).get("totalBytes", 0) / (1024 ** 3), 2)
+
         if self._value_key == "eveningSpeedValue":
             try:
                 return int(current_service.get("eveningSpeed", "").split(" ")[0])
