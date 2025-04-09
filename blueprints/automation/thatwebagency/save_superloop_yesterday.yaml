@@ -52,26 +52,32 @@ trigger:
 
 condition: []
 
+variables:
+  free_download_sensor: !input free_download_sensor
+  nonfree_download_sensor: !input nonfree_download_sensor
+  free_upload_sensor: !input free_upload_sensor
+  nonfree_upload_sensor: !input nonfree_upload_sensor
+
 action:
   - service: input_number.set_value
     target:
       entity_id: !input free_download_helper
     data:
-      value: "{{ states(!input free_download_sensor) | float(0) }}"
+      value: "{{ states(free_download_sensor) | float(0) }}"
   - service: input_number.set_value
     target:
       entity_id: !input free_upload_helper
     data:
-      value: "{{ states(!input free_upload_sensor) | float(0) }}"
+      value: "{{ states(free_upload_sensor) | float(0) }}"
   - service: input_number.set_value
     target:
       entity_id: !input nonfree_download_helper
     data:
-      value: "{{ states(!input nonfree_download_sensor) | float(0) }}"
+      value: "{{ states(nonfree_download_sensor) | float(0) }}"
   - service: input_number.set_value
     target:
       entity_id: !input nonfree_upload_helper
     data:
-      value: "{{ states(!input nonfree_upload_sensor) | float(0) }}"
+      value: "{{ states(nonfree_upload_sensor) | float(0) }}"
 
 mode: single
