@@ -49,29 +49,39 @@ blueprint:
         entity:
           domain: input_number
 
+variables:
+  free_download_sensor: !input free_download_sensor
+  free_download_helper: !input free_download_helper
+  nonfree_download_sensor: !input nonfree_download_sensor
+  nonfree_download_helper: !input nonfree_download_helper
+  free_upload_sensor: !input free_upload_sensor
+  free_upload_helper: !input free_upload_helper
+  nonfree_upload_sensor: !input nonfree_upload_sensor
+  nonfree_upload_helper: !input nonfree_upload_helper
+
 template:
   - sensor:
       - name: "Superloop Daily Free Download Usage"
         unit_of_measurement: "GB"
         state: >
-          {% set today = states(!input free_download_sensor) | float(0) %}
-          {% set yesterday = states(!input free_download_helper) | float(0) %}
+          {% set today = states(free_download_sensor) | float(0) %}
+          {% set yesterday = states(free_download_helper) | float(0) %}
           {{ (today - yesterday) | round(2) }}
       - name: "Superloop Daily Non-Free Download Usage"
         unit_of_measurement: "GB"
         state: >
-          {% set today = states(!input nonfree_download_sensor) | float(0) %}
-          {% set yesterday = states(!input nonfree_download_helper) | float(0) %}
+          {% set today = states(nonfree_download_sensor) | float(0) %}
+          {% set yesterday = states(nonfree_download_helper) | float(0) %}
           {{ (today - yesterday) | round(2) }}
       - name: "Superloop Daily Free Upload Usage"
         unit_of_measurement: "GB"
         state: >
-          {% set today = states(!input free_upload_sensor) | float(0) %}
-          {% set yesterday = states(!input free_upload_helper) | float(0) %}
+          {% set today = states(free_upload_sensor) | float(0) %}
+          {% set yesterday = states(free_upload_helper) | float(0) %}
           {{ (today - yesterday) | round(2) }}
       - name: "Superloop Daily Non-Free Upload Usage"
         unit_of_measurement: "GB"
         state: >
-          {% set today = states(!input nonfree_upload_sensor) | float(0) %}
-          {% set yesterday = states(!input nonfree_upload_helper) | float(0) %}
+          {% set today = states(nonfree_upload_sensor) | float(0) %}
+          {% set yesterday = states(nonfree_upload_helper) | float(0) %}
           {{ (today - yesterday) | round(2) }}
