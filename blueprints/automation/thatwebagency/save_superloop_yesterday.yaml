@@ -65,18 +65,23 @@ action:
   - service: input_number.set_value
     data:
       entity_id: !input free_download_helper
+    data_template:
       value: "{{ states(!input free_download_sensor) | float(0) }}"
   - service: input_number.set_value
     data:
       entity_id: !input nonfree_download_helper
+    data_template:
       value: "{{ states(!input nonfree_download_sensor) | float(0) }}"
   - service: input_number.set_value
     data:
       entity_id: !input free_upload_helper
+    data_template:
       value: "{{ states(!input free_upload_sensor) | float(0) }}"
   - service: input_number.set_value
     data:
       entity_id: !input nonfree_upload_helper
+    data_template:
       value: "{{ states(!input nonfree_upload_sensor) | float(0) }}"
+
 
 mode: single
