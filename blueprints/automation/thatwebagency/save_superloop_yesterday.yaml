@@ -1,0 +1,82 @@
+blueprint:
+  name: Save Superloop Usage Snapshots
+  description: >
+    Save the current Superloop usage values (free/non-free download/upload) at midnight each day.
+    Used for calculating daily usage deltas.
+  domain: automation
+  input:
+    free_download_sensor:
+      name: Free Download Usage Sensor
+      description: Select your Free Download Usage sensor
+      selector:
+        entity:
+          domain: sensor
+    free_download_helper:
+      name: Free Download Yesterday Helper
+      description: Select your input_number to save yesterday's Free Download
+      selector:
+        entity:
+          domain: input_number
+
+    nonfree_download_sensor:
+      name: Non-Free Download Usage Sensor
+      description: Select your Non-Free Download Usage sensor
+      selector:
+        entity:
+          domain: sensor
+    nonfree_download_helper:
+      name: Non-Free Download Yesterday Helper
+      description: Select your input_number to save yesterday's Non-Free Download
+      selector:
+        entity:
+          domain: input_number
+
+    free_upload_sensor:
+      name: Free Upload Usage Sensor
+      description: Select your Free Upload Usage sensor
+      selector:
+        entity:
+          domain: sensor
+    free_upload_helper:
+      name: Free Upload Yesterday Helper
+      description: Select your input_number to save yesterday's Free Upload
+      selector:
+        entity:
+          domain: input_number
+
+    nonfree_upload_sensor:
+      name: Non-Free Upload Usage Sensor
+      description: Select your Non-Free Upload Usage sensor
+      selector:
+        entity:
+          domain: sensor
+    nonfree_upload_helper:
+      name: Non-Free Upload Yesterday Helper
+      description: Select your input_number to save yesterday's Non-Free Upload
+      selector:
+        entity:
+          domain: input_number
+
+trigger:
+  - platform: time
+    at: "00:05:00"
+
+action:
+  - service: input_number.set_value
+    data:
+      entity_id: !input free_download_helper
+      value: "{{ states(!input free_download_sensor) | float(0) }}"
+  - service: input_number.set_value
+    data:
+      entity_id: !input nonfree_download_helper
+      value: "{{ states(!input nonfree_download_sensor) | float(0) }}"
+  - service: input_number.set_value
+    data:
+      entity_id: !input free_upload_helper
+      value: "{{ states(!input free_upload_sensor) | float(0) }}"
+  - service: input_number.set_value
+    data:
+      entity_id: !input nonfree_upload_helper
+      value: "{{ states(!input nonfree_upload_sensor) | float(0) }}"
+
+mode: single

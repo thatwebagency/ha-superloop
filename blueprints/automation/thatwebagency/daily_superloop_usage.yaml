@@ -1,0 +1,77 @@
+blueprint:
+  name: Create Superloop Daily Usage Sensors
+  description: >
+    Create sensors showing daily Superloop usage for
+    Free Download, Non-Free Download, Free Upload, and Non-Free Upload.
+  domain: template
+  input:
+    free_download_sensor:
+      name: Free Download Usage Sensor
+      selector:
+        entity:
+          domain: sensor
+    free_download_helper:
+      name: Free Download Yesterday Helper
+      selector:
+        entity:
+          domain: input_number
+
+    nonfree_download_sensor:
+      name: Non-Free Download Usage Sensor
+      selector:
+        entity:
+          domain: sensor
+    nonfree_download_helper:
+      name: Non-Free Download Yesterday Helper
+      selector:
+        entity:
+          domain: input_number
+
+    free_upload_sensor:
+      name: Free Upload Usage Sensor
+      selector:
+        entity:
+          domain: sensor
+    free_upload_helper:
+      name: Free Upload Yesterday Helper
+      selector:
+        entity:
+          domain: input_number
+
+    nonfree_upload_sensor:
+      name: Non-Free Upload Usage Sensor
+      selector:
+        entity:
+          domain: sensor
+    nonfree_upload_helper:
+      name: Non-Free Upload Yesterday Helper
+      selector:
+        entity:
+          domain: input_number
+
+template:
+  - sensor:
+      - name: "Superloop Daily Free Download Usage"
+        unit_of_measurement: "GB"
+        state: >
+          {% set today = states(!input free_download_sensor) | float(0) %}
+          {% set yesterday = states(!input free_download_helper) | float(0) %}
+          {{ (today - yesterday) | round(2) }}
+      - name: "Superloop Daily Non-Free Download Usage"
+        unit_of_measurement: "GB"
+        state: >
+          {% set today = states(!input nonfree_download_sensor) | float(0) %}
+          {% set yesterday = states(!input nonfree_download_helper) | float(0) %}
+          {{ (today - yesterday) | round(2) }}
+      - name: "Superloop Daily Free Upload Usage"
+        unit_of_measurement: "GB"
+        state: >
+          {% set today = states(!input free_upload_sensor) | float(0) %}
+          {% set yesterday = states(!input free_upload_helper) | float(0) %}
+          {{ (today - yesterday) | round(2) }}
+      - name: "Superloop Daily Non-Free Upload Usage"
+        unit_of_measurement: "GB"
+        state: >
+          {% set today = states(!input nonfree_upload_sensor) | float(0) %}
+          {% set yesterday = states(!input nonfree_upload_helper) | float(0) %}
+          {{ (today - yesterday) | round(2) }}

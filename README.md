@@ -1,1 +1,147 @@
-<div class="_main_5jn6z_1 z-10 markdown prose dark:prose-invert contain-inline-size focus:outline-hidden bg-transparent ProseMirror" contenteditable="true" style="width: 775px;" translate="no"><h1><span>🏄‍♂️ Superloop Home Assistant Integration</span></h1><p><span>A sleek Home Assistant integration to monitor your </span><span><strong>Superloop</strong></span><span> broadband usage, plan, and billing status. Now with </span><span><strong>Usage Alerts</strong></span><span> and beautiful </span><span><strong>Mini Graph Cards</strong></span><span> support!</span></p><div contenteditable="false"><hr></div><h2><span>🌟 Features</span></h2><p><span>This integration provides real-time Superloop account sensors for:</span></p><ul data-spread="false"><li><p><span>📈 </span><span><strong>Data Usage</strong></span><span> (Free Download / Upload)</span></p></li><li><p><span>🚀 </span><span><strong>Download Speed</strong></span><span> (Evening Plan Speed)</span></p></li><li><p><span>🗕️ </span><span><strong>Billing Cycle Progress</strong></span></p></li><li><p><span>📃 </span><span><strong>Plan Name</strong></span></p></li><li><p><span>📦 </span><span><strong>Plan Allowance</strong></span><span> (e.g., "Unlimited Data" or "500 GB")</span></p></li><li><p><span>🗓️ </span><span><strong>Billing Cycle Dates</strong></span></p></li><li><p><span>⚡ </span><span><strong>Automatic Refreshing</strong></span><span> and </span><span><strong>Silent Re-Authentication</strong></span></p></li></ul><div contenteditable="false"><hr></div><h2><span>🚀 Installation</span></h2><h3><span>HACS Installation (Recommended)</span></h3><ol data-spread="false" start="1"><li><p><span>Open HACS in Home Assistant</span></p></li><li><p><span>Navigate to </span><span><strong>Integrations</strong></span></p></li><li><p><span>Click the three dots (...) → </span><span><strong>Custom Repositories</strong></span></p></li><li><p><span>Add </span><span><strong>this GitHub repo URL</strong></span><span> as a </span><span><strong>"Integration"</strong></span><span> type</span></p></li><li><p><span>Click </span><span><strong>Add</strong></span></p></li><li><p><span>Search for </span><span><strong>Superloop</strong></span><span> under Integrations</span></p></li><li><p><span>Click </span><span><strong>Install</strong></span></p></li><li><p><span>Restart Home Assistant</span></p></li></ol><h3><span>Manual Installation</span></h3><ol data-spread="false" start="1"><li><p><span>Copy the </span><code><span>custom_components/superloop</span></code><span> folder into your Home Assistant </span><code><span>custom_components/</span></code><span> directory.</span></p></li><li><p><span>Restart Home Assistant.</span></p></li></ol><div contenteditable="false"><hr></div><h2><span>⚙️ Configuration</span></h2><ol data-spread="false" start="1"><li><p><span>Go to </span><span><strong>Settings → Devices &amp; Services</strong></span></p></li><li><p><span>Click </span><span><strong>+ Add Integration</strong></span></p></li><li><p><span>Search for </span><span><strong>Superloop</strong></span></p></li><li><p><span>Enter your </span><span><strong>Superloop email</strong></span><span> and </span><span><strong>password</strong></span><span> to link your account.</span></p></li></ol><p><span>Done! Your sensors will now appear automatically.</span></p><div contenteditable="false"><hr></div><h2><span>📈 Dashboard Setup</span></h2><p><span>We recommend installing the </span><span><strong>mini-graph-card</strong></span><span> from HACS to beautifully display your Superloop data.</span></p><p><span>Here’s an example dashboard card:</span></p><div class="cm-editor ͼ1 ͼ3 ͼ4 ͼ1o ͼ28" data-is-code-block-view="true" contenteditable="false"><div class="cm-announced" aria-live="polite"></div><div tabindex="-1" class="cm-scroller"><div spellcheck="false" autocorrect="off" autocapitalize="off" translate="no" contenteditable="true" class="cm-content" role="textbox" aria-multiline="true" data-language="yaml" style="tab-size: 4;"><div class="cm-line"><span class="ͼ1r ͼl">type</span><span class="ͼ1w">:</span> custom:mini-graph-card</div><div class="cm-line"><span class="ͼ1r ͼl">entities</span><span class="ͼ1w">:</span></div><div class="cm-line">  <span class="ͼ1w">-</span> <span class="ͼ1r ͼl">entity</span><span class="ͼ1w">:</span> sensor.superloop_free_download_usage</div><div class="cm-line">  <span class="ͼ1w">-</span> <span class="ͼ1r ͼl">entity</span><span class="ͼ1w">:</span> sensor.superloop_free_upload_usage</div><div class="cm-line"><span class="ͼ1r ͼl">name</span><span class="ͼ1w">:</span> Superloop Usage</div><div class="cm-line"><span class="ͼ1r ͼl">line_width</span><span class="ͼ1w">:</span> 5</div><div class="cm-line"><span class="ͼ1r ͼl">smoothing</span><span class="ͼ1w">:</span> true</div><div class="cm-line"><span class="ͼ1r ͼl">hours_to_show</span><span class="ͼ1w">:</span> 720 <span class="ͼ23 ͼm"># 30 days</span></div></div><div class="cm-layer cm-layer-above cm-cursorLayer" aria-hidden="true" style="z-index: 150; animation-duration: 1200ms;"><div class="cm-cursor cm-cursor-primary" style="left: 6px; top: 5px; height: 19px;"></div></div><div class="cm-layer cm-selectionLayer" aria-hidden="true" style="z-index: -2;"></div></div></div><p><span>🔵 This will show your </span><span><strong>last 30 days</strong></span><span> of free download and upload usage visually!</span></p><div contenteditable="false"><hr></div><h2><span>📢 Usage Alerts via Blueprint (New!)</span></h2><p><span>Want to be notified when your usage hits </span><span><strong>90% of your Plan Allowance</strong></span><span>?</span></p><p><span>We built a ready-to-go automation for you! 🎯</span></p><ul data-spread="false"><li><p><span>Monitors your </span><span><strong>Data Usage</strong></span><span> vs your </span><span><strong>Plan Allowance</strong></span><span>.</span></p></li><li><p><span>Automatically </span><span><strong>skips alerts for Unlimited plans</strong></span><span>.</span></p></li><li><p><span>Sends a </span><span><strong>persistent notification</strong></span><span> if you cross 90%!</span></p></li></ul><p><span>🎯 </span><span><strong>No YAML editing needed</strong></span><span> — just pick your usage sensor and plan allowance sensor when setting it up!</span></p><p><br class="ProseMirror-trailingBreak"></p><div contenteditable="false"><hr></div><h2><span>🛠️ Troubleshooting</span></h2><ul data-spread="false"><li><p><span>Check Home Assistant </span><span><strong>Logs</strong></span><span> if sensors are missing.</span></p></li><li><p><span>Verify your </span><span><strong>Superloop credentials</strong></span><span> are correct.</span></p></li><li><p><span>If the billing cycle does not reset properly, verify </span><span><strong>API access</strong></span><span>.</span></p></li><li><p><span>Open an </span><a href="https://github.com/thatwebagency/ha-superloop/issues" disabled="false"><span>issue on GitHub</span></a><span> if stuck.</span></p></li></ul><div contenteditable="false"><hr></div><h2><span>❤️ Support</span></h2><p><span>If you find this integration useful, please ⭐️ star the repository! Need help? Open a </span><a href="https://github.com/thatwebagency/ha-superloop/issues" disabled="false"><span>GitHub Issue</span></a><span>.</span></p><div contenteditable="false"><hr></div><p><span>🏄‍♂️ Surf your data usage. Stay in control. Built with love for the Home Assistant community. 🏡</span></p><p><br class="ProseMirror-trailingBreak"></p></div>
+<div class="_main_5jn6z_1 z-10 markdown prose dark:prose-invert contain-inline-size focus:outline-hidden bg-transparent ProseMirror" contenteditable="true" style="width: 775px;" translate="no">
+<h1>🏄‍♂️ Superloop Home Assistant Integration</h1>
+<p>A sleek Home Assistant integration to monitor your <strong>Superloop</strong> broadband usage, plan, and billing status. Now with <strong>Usage Alerts</strong> and beautiful <strong>Mini Graph Cards</strong> support!</p>
+
+<hr>
+
+<h2>🌟 Features</h2>
+<p>This integration provides real-time Superloop account sensors for:</p>
+<ul>
+  <li>📈 <strong>Data Usage</strong> (Free Download / Upload)</li>
+  <li>🚀 <strong>Download Speed</strong> (Evening Plan Speed)</li>
+  <li>🗕️ <strong>Billing Cycle Progress</strong></li>
+  <li>📃 <strong>Plan Name</strong></li>
+  <li>📦 <strong>Plan Allowance</strong> (e.g., "Unlimited Data" or "500 GB")</li>
+  <li>🗓️ <strong>Billing Cycle Dates</strong></li>
+  <li>⚡ <strong>Automatic Refreshing</strong> and <strong>Silent Re-Authentication</strong></li>
+</ul>
+
+<hr>
+
+<h2>🚀 Installation</h2>
+
+<h3>HACS Installation (Recommended)</h3>
+<ol>
+  <li>Open HACS in Home Assistant</li>
+  <li>Navigate to <strong>Integrations</strong></li>
+  <li>Click the three dots (...) → <strong>Custom Repositories</strong></li>
+  <li>Add <strong>this GitHub repo URL</strong> as a <strong>"Integration"</strong> type</li>
+  <li>Click <strong>Add</strong></li>
+  <li>Search for <strong>Superloop</strong> under Integrations</li>
+  <li>Click <strong>Install</strong></li>
+  <li>Restart Home Assistant</li>
+</ol>
+
+<h3>Manual Installation</h3>
+<ol>
+  <li>Copy the <code>custom_components/superloop</code> folder into your Home Assistant <code>custom_components/</code> directory.</li>
+  <li>Restart Home Assistant.</li>
+</ol>
+
+<hr>
+
+<h2>⚙️ Configuration</h2>
+<ol>
+  <li>Go to <strong>Settings → Devices &amp; Services</strong></li>
+  <li>Click <strong>+ Add Integration</strong></li>
+  <li>Search for <strong>Superloop</strong></li>
+  <li>Enter your <strong>Superloop email</strong> and <strong>password</strong> to link your account.</li>
+</ol>
+<p>Done! Your sensors will now appear automatically.</p>
+
+<hr>
+
+<h2>📈 Dashboard Setup</h2>
+<p>We recommend installing the <strong>mini-graph-card</strong> from HACS to beautifully display your Superloop data.</p>
+<p>Example dashboard card:</p>
+
+<pre>
+<code>
+type: custom:mini-graph-card
+entities:
+  - entity: sensor.superloop_free_download_usage
+  - entity: sensor.superloop_free_upload_usage
+name: Superloop Usage
+line_width: 5
+smoothing: true
+hours_to_show: 720  # 30 days
+</code>
+</pre>
+
+<p>🔵 This will show your <strong>last 30 days</strong> of free download and upload usage visually!</p>
+
+<hr>
+
+<h2>📢 Usage Alerts via Blueprint (New!)</h2>
+<p>Want to be notified when your usage hits <strong>90% of your Plan Allowance</strong>?</p>
+<p>We built a ready-to-go automation for you! 🎯</p>
+
+<ul>
+  <li>Monitors your <strong>Data Usage</strong> vs your <strong>Plan Allowance</strong>.</li>
+  <li>Automatically <strong>skips alerts for Unlimited plans</strong>.</li>
+  <li>Sends a <strong>persistent notification</strong> if you cross 90%!</li>
+</ul>
+
+<p>🎯 <strong>No YAML editing needed</strong> — just pick your usage sensor and plan allowance sensor when setting it up!</p>
+
+<p>👉 <a href="https://my.home-assistant.io/redirect/blueprint_import/?url=https://github.com/thatwebagency/ha-superloop/blob/main/blueprints/automation/thatwebagency/superloop_usage_alert.yaml">Import the Usage Alert Blueprint Here</a></p>
+
+<hr>
+
+<h2>📅 Daily Usage Tracking (Optional)</h2>
+
+<p>Track your <strong>daily Superloop download and upload usage</strong> automatically!</p>
+
+<h3>Step 1: Create Helpers</h3>
+<p>Create 4 <strong>Input Number</strong> helpers:</p>
+<ul>
+  <li>Superloop Free Download Yesterday</li>
+  <li>Superloop Non-Free Download Yesterday</li>
+  <li>Superloop Free Upload Yesterday</li>
+  <li>Superloop Non-Free Upload Yesterday</li>
+</ul>
+<p>Settings: Minimum: 0, Maximum: 100000, Unit: GB, Step: 0.1</p>
+
+<h3>Step 2: Save Yesterday's Usage (Automation)</h3>
+<p>👉 <a href="https://my.home-assistant.io/redirect/blueprint_import/?url=https://github.com/thatwebagency/ha-superloop/blob/main/blueprints/automation/thatwebagency/save_superloop_yesterday.yaml">Import Save Yesterday Usage Blueprint</a></p>
+
+<h3>Step 3: Create Daily Usage Sensors</h3>
+<p>👉 <a href="https://my.home-assistant.io/redirect/blueprint_import/?url=https://github.com/thatwebagency/ha-superloop/blob/main/blueprints/template/thatwebagency/daily_superloop_usage.yaml">Import Daily Usage Sensor Blueprint</a></p>
+
+<h3>Step 4: Add to your Dashboard</h3>
+
+<pre>
+<code>
+type: custom:mini-graph-card
+name: Superloop Daily Usage
+hours_to_show: 720
+points_per_hour: 1
+entities:
+  - entity: sensor.superloop_daily_free_download_usage
+  - entity: sensor.superloop_daily_nonfree_download_usage
+  - entity: sensor.superloop_daily_free_upload_usage
+  - entity: sensor.superloop_daily_nonfree_upload_usage
+</code>
+</pre>
+
+<p>🎯 Done! You now have beautiful per-day tracking graphs!</p>
+
+<hr>
+
+<h2>🛠️ Troubleshooting</h2>
+<ul>
+  <li>Check Home Assistant <strong>Logs</strong> if sensors are missing.</li>
+  <li>Verify your <strong>Superloop credentials</strong> are correct.</li>
+  <li>If the billing cycle does not reset properly, verify <strong>API access</strong>.</li>
+  <li>Open an <a href="https://github.com/thatwebagency/ha-superloop/issues">issue on GitHub</a> if stuck.</li>
+</ul>
+
+<hr>
+
+<h2>❤️ Support</h2>
+<p>If you find this integration useful, please ⭐️ star the repository! Need help? Open a <a href="https://github.com/thatwebagency/ha-superloop/issues">GitHub Issue</a>.</p>
+
+<hr>
+
+<p>🏄‍♂️ Surf your data usage. Stay in control. Built with love for the Home Assistant community. 🏡</p>
+</div>
