@@ -165,9 +165,10 @@ template:
 <h3>Step 2: Save Yesterday's Usage (Automation)</h3>
 <p>👉 <a href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fthatwebagency%2Fha-superloop%2Fblob%2Fmaster%2Fblueprints%2Fautomation%2Fthatwebagency%2Fsave_superloop_yesterday.yaml" target="_blank" rel="noreferrer noopener"><img src="https://my.home-assistant.io/badges/blueprint_import.svg" alt="Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled." /></a></p>
 
+<h3>Step 3: Create Daily Usage Sensors (blueprint)</h3>
+<p>👉 <a href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fthatwebagency%2Fha-superloop%2Fblob%2Fmaster%2Fblueprints%2Fautomation%2Fthatwebagency%2Fdaily_superloop_usage.yaml" target="_blank" rel="noreferrer noopener"><img src="https://my.home-assistant.io/badges/blueprint_import.svg" alt="Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled." /></a></p>
 
-
-<h3>Step 3: Add to your Dashboard</h3>
+<h3>Step 4: Add to your Dashboard</h3>
 
 <pre>
 <code>
