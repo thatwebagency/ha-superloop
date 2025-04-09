@@ -128,6 +128,7 @@ style: |
 
 <h3>Step 1: Create Helpers</h3>
 <p>Create 4 <strong>Input Number</strong> helpers:</p>
+<p>Manually via UI</p>
 <ul>
   <li>Superloop Free Download Yesterday</li>
   <li>Superloop Non-Free Download Yesterday</li>
@@ -135,14 +136,38 @@ style: |
   <li>Superloop Non-Free Upload Yesterday</li>
 </ul>
 <p>Settings: Minimum: 0, Maximum: 100000, Unit: GB, Step: 0.1</p>
+<br>
+<p>Or use the <strong>YAML</strong> below:</p>
+<pre>
+<code>
+template:
+  - sensor:
+      - name: "Superloop Daily Free Download Usage"
+        unit_of_measurement: "GB"
+        state: >
+          {{ (states('sensor.superloop_free_download_usage') | float(0) - states('input_number.superloop_free_download_yesterday') | float(0)) | round(2) }}
+      - name: "Superloop Daily Non-Free Download Usage"
+        unit_of_measurement: "GB"
+        state: >
+          {{ (states('sensor.superloop_nonfree_download_usage') | float(0) - states('input_number.superloop_nonfree_download_yesterday') | float(0)) | round(2) }}
+      - name: "Superloop Daily Free Upload Usage"
+        unit_of_measurement: "GB"
+        state: >
+          {{ (states('sensor.superloop_free_upload_usage') | float(0) - states('input_number.superloop_free_upload_yesterday') | float(0)) | round(2) }}
+      - name: "Superloop Daily Non-Free Upload Usage"
+        unit_of_measurement: "GB"
+        state: >
+          {{ (states('sensor.superloop_nonfree_upload_usage') | float(0) - states('input_number.superloop_nonfree_upload_yesterday') | float(0)) | round(2) }}
+
+</code>
+</pre>
 
 <h3>Step 2: Save Yesterday's Usage (Automation)</h3>
 <p>👉 <a href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fthatwebagency%2Fha-superloop%2Fblob%2Fmaster%2Fblueprints%2Fautomation%2Fthatwebagency%2Fsave_superloop_yesterday.yaml" target="_blank" rel="noreferrer noopener"><img src="https://my.home-assistant.io/badges/blueprint_import.svg" alt="Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled." /></a></p>
 
-<h3>Step 3: Create Daily Usage Sensors</h3>
-<p>👉 <a href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fthatwebagency%2Fha-superloop%2Fblob%2Fmaster%2Fblueprints%2Ftemplate%2Fthatwebagency%2Fdaily_superloop_usage.yaml" target="_blank" rel="noreferrer noopener"><img src="https://my.home-assistant.io/badges/blueprint_import.svg" alt="Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled." /></a></p>
 
-<h3>Step 4: Add to your Dashboard</h3>
+
+<h3>Step 3: Add to your Dashboard</h3>
 
 <pre>
 <code>
