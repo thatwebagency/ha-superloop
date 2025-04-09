@@ -1,5 +1,9 @@
 {
-    "name": "Superloop",
-    "render_readme": true,
-    "homeassistant": "2023.8.0"
-  }
+  "name": "Superloop",
+  "render_readme": true,
+  "homeassistant": "2023.8.0",
+  "country": ["AU"],
+  "iot_class": "cloud_polling",
+  "domain": "superloop",
+  "integration_type": "integration"
+}
