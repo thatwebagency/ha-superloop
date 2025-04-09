@@ -28,15 +28,24 @@ class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._password = None
         self._access_token = None
         self._refresh_token = None
-
+        self._mfa_method = "MfaOverSMS"
+        
     async def async_step_user(self, user_input=None):
         if user_input is not None:
             self._email = user_input["email"]
             self._password = user_input["password"]
-
+            mfa_method = user_input.get("mfa_method", "sms")
+            
+            if mfa_method == "sms":
+                self._mfa_method = "MfaOverSMS"
+            elif mfa_method == "email":
+                self._mfa_method = "MfaOverEmail"
+            else:
+                self._mfa_method = "MfaOverSMS"
+                
             try:
                 self._access_token, self._refresh_token = await self._attempt_login(self._email, self._password)
-                await self._trigger_mfa_sms(self._access_token)
+                await self._trigger_mfa_sms(self._access_token, self._mfa_method)
             except InvalidAuth:
                 return self.async_show_form(
                     step_id="user",
@@ -56,6 +65,12 @@ class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 {
                     vol.Required("email"): str,
                     vol.Required("password"): str,
+                    vol.Required("mfa_method", default="sms"): vol.In(
+                        {
+                            "sms": "SMS (Text Message)",
+                            "email": "Email",
+                        }
+                    ),
                 }
             ),
         )
@@ -65,7 +80,7 @@ class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             code = user_input["code"]
 
             try:
-                await self._verify_2fa_code(self._access_token, code)
+                await self._verify_2fa_code(self._access_token, code, self._mfa_method)
             except InvalidAuth:
                 return self.async_show_form(
                     step_id="2fa",
@@ -131,22 +146,22 @@ class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         except asyncio.TimeoutError as ex:
             raise CannotConnect() from ex
 
-    async def _trigger_mfa_sms(self, access_token: str):
-        """Trigger SMS MFA after login."""
+    async def _trigger_mfa(self, access_token: str, mfa_action: str):
+        """Trigger MFA after login."""
         headers = {"Authorization": f"Bearer {access_token}"}
 
         try:
             async with aiohttp.ClientSession() as session:
                 async with async_timeout.timeout(10):
                     await session.get(MFA_URL, headers=headers)
-                    await session.post(CREATE_MFA_URL, json={"action": "MfaOverSMS"}, headers=headers)
+                    await session.post(CREATE_MFA_URL, json={"action": mfa_action}, headers=headers)
         except asyncio.TimeoutError as ex:
             raise CannotConnect() from ex
 
-    async def _verify_2fa_code(self, access_token: str, code: str):
+    async def _verify_2fa_code(self, access_token: str, code: str, mfa_action: str):
         """Verify the entered 2FA code."""
         headers = {"Authorization": f"Bearer {access_token}"}
-        payload = {"action": "MfaOverSMS", "token": code}
+        payload = {"action": mfa_action, "token": code}
 
         try:
             async with aiohttp.ClientSession() as session:
