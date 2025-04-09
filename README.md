@@ -58,13 +58,47 @@
 <pre>
 <code>
 type: custom:mini-graph-card
+name: Download Usage
+icon: mdi:download
 entities:
   - entity: sensor.superloop_free_download_usage
-  - entity: sensor.superloop_free_upload_usage
-name: Superloop Usage
+show:
+  name: true
+  icon: true
+  state: true
+  graph: line
+  labels: false
 line_width: 5
+font_size: 80
 smoothing: true
-hours_to_show: 720  # 30 days
+height: 150
+style: |
+  ha-card {
+    background: rgba(20, 20, 20, 0.9);
+    border-radius: 16px;
+  }
+</code>
+<code>
+type: custom:mini-graph-card
+name: Upload Usage
+icon: mdi:upload
+entities:
+  - entity: sensor.superloop_free_upload_usage
+show:
+  name: true
+  icon: true
+  state: true
+  graph: line
+  labels: false
+line_width: 5
+font_size: 80
+smoothing: true
+height: 150
+style: |
+  ha-card {
+    background: rgba(20, 20, 20, 0.9);
+    border-radius: 16px;
+  }
 </code>
 </pre>
 
@@ -84,7 +118,7 @@ hours_to_show: 720  # 30 days
 
 <p>🎯 <strong>No YAML editing needed</strong> — just pick your usage sensor and plan allowance sensor when setting it up!</p>
 
-<p>👉 <a href="https://my.home-assistant.io/redirect/blueprint_import/?url=https://github.com/thatwebagency/ha-superloop/blob/main/blueprints/automation/thatwebagency/superloop_usage_alert.yaml">Import the Usage Alert Blueprint Here</a></p>
+<p>👉 <a href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fthatwebagency%2Fha-superloop%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fthatwebagency%2Fsuperloop_usage_alert.yaml" target="_blank" rel="noreferrer noopener"><img src="https://my.home-assistant.io/badges/blueprint_import.svg" alt="Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled." /></a></p>
 
 <hr>
 
@@ -103,10 +137,10 @@ hours_to_show: 720  # 30 days
 <p>Settings: Minimum: 0, Maximum: 100000, Unit: GB, Step: 0.1</p>
 
 <h3>Step 2: Save Yesterday's Usage (Automation)</h3>
-<p>👉 <a href="https://my.home-assistant.io/redirect/blueprint_import/?url=https://github.com/thatwebagency/ha-superloop/blob/main/blueprints/automation/thatwebagency/save_superloop_yesterday.yaml">Import Save Yesterday Usage Blueprint</a></p>
+<p>👉 <a href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fthatwebagency%2Fha-superloop%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fthatwebagency%2Fsave_superloop_yesterday.yaml" target="_blank" rel="noreferrer noopener"><img src="https://my.home-assistant.io/badges/blueprint_import.svg" alt="Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled." /></a></p>
 
 <h3>Step 3: Create Daily Usage Sensors</h3>
-<p>👉 <a href="https://my.home-assistant.io/redirect/blueprint_import/?url=https://github.com/thatwebagency/ha-superloop/blob/main/blueprints/template/thatwebagency/daily_superloop_usage.yaml">Import Daily Usage Sensor Blueprint</a></p>
+<p>👉 <a href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fthatwebagency%2Fha-superloop%2Fblob%2Fmain%2Fblueprints%2Ftemplate%2Fthatwebagency%2Fdaily_superloop_usage.yaml" target="_blank" rel="noreferrer noopener"><img src="https://my.home-assistant.io/badges/blueprint_import.svg" alt="Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled." /></a></p>
 
 <h3>Step 4: Add to your Dashboard</h3>
 
