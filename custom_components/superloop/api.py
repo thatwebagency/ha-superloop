@@ -25,7 +25,8 @@ class SuperloopClient:
 
     async def async_close(self):
         """Close the aiohttp session."""
-        await self._session.close()
+        if not self._session.closed:
+            await self._session.close()
 
     async def async_get_services(self):
         """Fetch user services from Superloop, handle token expiration."""
@@ -38,14 +39,12 @@ class SuperloopClient:
 
                 if response.status == 401:
                     _LOGGER.warning("Access token expired, trying refresh token...")
-                    if await self.async_refresh_token():
-                        # Try original request again with new token
-                        headers = self._build_headers()
-                        response = await self._session.get(f"{BASE_API_URL}/getServices/", headers=headers)
-                        if response.status == 401:
-                            raise ConfigEntryAuthFailed("Superloop reauthentication failed after refresh")
-                    else:
-                        raise ConfigEntryAuthFailed("Superloop refresh token invalid")
+                    await self._try_refresh_token()
+                    # After refresh, retry once
+                    headers = self._build_headers()
+                    response = await self._session.get(f"{BASE_API_URL}/getServices/", headers=headers)
+                    if response.status == 401:
+                        raise ConfigEntryAuthFailed("Superloop reauthentication failed after refresh")
 
                 if response.status != 200:
                     _LOGGER.error("Failed to fetch services: %s", response.status)
@@ -59,8 +58,8 @@ class SuperloopClient:
             _LOGGER.error("Timeout fetching services")
             raise SuperloopApiError("Timeout fetching services") from ex
 
-    async def async_refresh_token(self) -> bool:
-        """Refresh the access token using the refresh token."""
+    async def _try_refresh_token(self):
+        """Try to refresh the access token. Raise ConfigEntryAuthFailed if it fails."""
         payload = {"refresh_token": self._refresh_token}
 
         try:
@@ -68,8 +67,8 @@ class SuperloopClient:
                 response = await self._session.post(REFRESH_URL, json=payload)
 
                 if response.status != 200:
-                    _LOGGER.error("Failed to refresh token")
-                    return False
+                    _LOGGER.error("Failed to refresh token (status %s)", response.status)
+                    raise ConfigEntryAuthFailed("Superloop refresh token invalid")
 
                 data = await response.json()
                 self._access_token = data["access_token"]
@@ -84,11 +83,10 @@ class SuperloopClient:
                         "refresh_token": self._refresh_token,
                     }
                 )
-                return True
 
         except asyncio.TimeoutError as ex:
             _LOGGER.error("Timeout refreshing token")
-            return False
+            raise ConfigEntryAuthFailed("Superloop refresh token timeout") from ex
 
     def _build_headers(self):
         """Helper to build auth headers."""
