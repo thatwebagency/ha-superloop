@@ -219,19 +219,13 @@ class SuperloopDailySensor(CoordinatorEntity, SensorEntity):
 
     @property
     def native_value(self):
-        """Return today's upload/download/total GB usage."""
+        """Return yesterday's upload/download/total GB usage."""
         daily = self.coordinator.daily_usage
         if not daily or "usageDaily" not in daily:
             return None
-
-        today_str = datetime.now().strftime("%d %b %Y")  # Example: "10 Apr 2025"
-        for day in daily["usageDaily"]:
-            if day[0] == today_str:
-                if self._sensor_type == "upload":
-                    return float(day[1].replace("GB", "").strip())
-                elif self._sensor_type == "download":
-                    return float(day[2].replace("GB", "").strip())
-                elif self._sensor_type == "total":
-                    return float(day[3].replace("GB", "").strip())
-
-        return None  # No match for today
+        yesterday = daily["usageDaily"][0]  # <- yesterday's record
+        try:
+            upload_str = yesterday[1].replace("GB", "").strip()
+            return float(upload_str)
+        except (IndexError, ValueError):
+            return None
