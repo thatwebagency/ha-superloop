@@ -206,7 +206,8 @@ class SuperloopDailySensor(CoordinatorEntity, SensorEntity):
         self._attr_icon = "mdi:chart-line"
         self._attr_device_class = "data_size"
         self._attr_native_unit_of_measurement = UnitOfInformation.GIGABYTES
-        self._attr_state_class = "measurement"
+        self._attr_state_class = "total"
+        self._last_reset = None
 
         if sensor_type == "upload":
             self._attr_name = "Superloop Daily Upload Usage"
@@ -224,16 +225,24 @@ class SuperloopDailySensor(CoordinatorEntity, SensorEntity):
         daily = self.coordinator.daily_usage
         if not daily or "usageDaily" not in daily:
             return None
-        yesterday = daily["usageDaily"][0]  # ← 0 is yesterday now
+        yesterday = daily["usageDaily"][0]
         try:
+            # Set _last_reset from yesterday date
+            if not self._last_reset:
+                date_obj = datetime.strptime(yesterday[0], "%d %b %Y")
+                self._last_reset = date_obj.replace(hour=0, minute=0, second=0, microsecond=0)
+
             if self._sensor_type == "upload":
-                value_str = yesterday[1]
+                value = yesterday[1].replace("GB", "").strip()
             elif self._sensor_type == "download":
-                value_str = yesterday[2]
+                value = yesterday[2].replace("GB", "").strip()
             elif self._sensor_type == "total":
-                value_str = yesterday[3]
-            else:
-                return None
-            return float(value_str.replace("GB", "").strip())
+                value = yesterday[3].replace("GB", "").strip()
+
+            return float(value)
         except (IndexError, ValueError):
             return None
+
+    @property
+    def last_reset(self):
+        return self._last_reset
