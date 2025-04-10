@@ -56,14 +56,14 @@ class SuperloopClient:
             _LOGGER.error("Timeout fetching services")
             raise SuperloopApiError("Timeout fetching services") from ex
 
-    async def async_get_daily_usage(self, service_id: int, month: str, year: str):
+    async def async_get_daily_usage(self, service_id: int):
         """Fetch daily broadband usage."""
         headers = self._build_headers()
-        url = f"{BASE_API_URL}/getBroadbandDailyUsage/{service_id}/{month}/{year}"
+        url = f"{BASE_API_URL}/getBroadbandDailyUsage/{service_id}"
 
         try:
             _LOGGER.debug("Fetching daily usage - URL: %s", url)  # NEW clearer log
-            async with async_timeout.timeout(10):
+            async with async_timeout.timeout(40):
                 response = await self._session.get(url, headers=headers)
 
                 if response.status == 401:

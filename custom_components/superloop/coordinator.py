@@ -38,12 +38,8 @@ class SuperloopCoordinator(DataUpdateCoordinator):
                 _LOGGER.warning("No broadband service ID found for daily usage fetch.")
                 return
 
-            now = datetime.now()
-            month_str = now.strftime("%b")  # e.g., "Apr"
-            year_str = now.strftime("%Y")   # e.g., "2025"
-
-            _LOGGER.debug("Fetching Superloop daily usage for %s %s", month_str, year_str)
-            self.daily_usage = await self.client.async_get_daily_usage(service_id, month_str, year_str)
+            _LOGGER.debug("Fetching Superloop daily usage for %s %s")
+            self.daily_usage = await self.client.async_get_daily_usage(service_id)
 
         except Exception as err:
             _LOGGER.error("Failed to fetch daily usage: %s", err)

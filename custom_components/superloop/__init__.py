@@ -2,6 +2,7 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
+from datetime import time
 
 from .api import SuperloopClient, SuperloopApiError
 from .coordinator import SuperloopCoordinator
@@ -27,7 +28,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry=entry,
     )
 
-    coordinator = SuperloopCoordinator(hass, client, update_interval_minutes=15)
+    coordinator = SuperloopCoordinator(hass, client, update_interval_minutes=30)
 
     try:
         await coordinator.async_config_entry_first_refresh()
@@ -44,6 +45,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # ✅ Forward to platforms (like sensors)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
+    # ✅ DAILY FETCH SETUP
+    async def _schedule_daily_usage(now):
+        _LOGGER.debug("Scheduled daily usage fetch triggered")
+        await coordinator.async_update_daily_usage()
+
+    # Fetch daily usage once on boot
+    hass.async_create_task(coordinator.async_update_daily_usage())
+
+    # Schedule fetch at 6:05 AM every day
+    async_track_time_change(
+        hass,
+        _schedule_daily_usage,
+        hour=6,
+        minute=5,
+        second=0,
+    )
+    
     return True
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
