@@ -2,6 +2,7 @@ import logging
 from datetime import timedelta, datetime
 
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.exceptions import ConfigEntryAuthFailed
 
 from .api import SuperloopClient, SuperloopApiError
 
@@ -24,9 +25,12 @@ class SuperloopCoordinator(DataUpdateCoordinator):
         """Fetch the latest service data from Superloop (regular usage)."""
         try:
             return await self.client.async_get_services()
+        except ConfigEntryAuthFailed as err:
+            # CRITICAL: Re-raise authentication errors so HA can trigger reauth
+            raise err
         except Exception as err:
             raise UpdateFailed(f"Error fetching Superloop service data: {err}") from err
-
+    
     async def async_update_daily_usage(self):
         """Fetch daily broadband usage once per day."""
         try:

@@ -9,5 +9,6 @@
   "dependencies": [],
   "codeowners": ["@thatwebagency"],
   "iot_class": "cloud_polling",
-  "auth_mandatory": false
+  "auth_mandatory": false,
+  "supports_reauth": true
 }
