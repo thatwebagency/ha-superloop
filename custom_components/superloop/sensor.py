@@ -28,11 +28,18 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
         # (Other regular sensors skipped for brevity...)
 
-    # Daily Usage Sensors
-    sensors.append(SuperloopDailyUploadSensor(coordinator))
-    sensors.append(SuperloopDailyDownloadSensor(coordinator))
-    sensors.append(SuperloopDailyTotalSensor(coordinator))
+    # ⏳ Defer daily usage sensors to AFTER first daily data fetched
+    async def async_setup_daily_sensors(_):
+        if coordinator.daily_usage:
+            _LOGGER.debug("Setting up Superloop Daily Usage sensors...")
+            async_add_entities([
+                SuperloopDailyUploadSensor(coordinator),
+                SuperloopDailyDownloadSensor(coordinator),
+                SuperloopDailyTotalSensor(coordinator),
+            ], True)
 
+    coordinator.async_add_listener(async_setup_daily_sensors)
+    
     async_add_entities(sensors, True)
 
 class SuperloopSensor(CoordinatorEntity, SensorEntity):

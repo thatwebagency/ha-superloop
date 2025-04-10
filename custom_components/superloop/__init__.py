@@ -3,6 +3,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from datetime import time
+from homeassistant.helpers.event import async_track_time_change
 
 from .api import SuperloopClient, SuperloopApiError
 from .coordinator import SuperloopCoordinator
