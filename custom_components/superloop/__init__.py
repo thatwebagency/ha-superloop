@@ -10,7 +10,7 @@ _LOGGER = logging.getLogger(__name__)
 
 DOMAIN = "superloop"
 
-# ✅ Add this
+# ✅ Platforms handled
 PLATFORMS = ["sensor"]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -31,6 +31,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     try:
         await coordinator.async_config_entry_first_refresh()
+        await coordinator.async_update_daily_usage()  # 🆕 Daily usage fetch at startup
     except SuperloopApiError as err:
         _LOGGER.error("Failed to connect to Superloop API: %s", err)
         raise ConfigEntryNotReady from err
@@ -40,7 +41,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
-    # ✅ Forward setup to sensor platform
+    # ✅ Forward to platforms (like sensors)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     return True

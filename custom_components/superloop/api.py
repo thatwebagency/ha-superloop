@@ -2,7 +2,6 @@ import logging
 import aiohttp
 import async_timeout
 import asyncio
-import time
 
 from homeassistant.exceptions import ConfigEntryAuthFailed
 
@@ -17,42 +16,36 @@ class SuperloopApiError(Exception):
 
 class SuperloopClient:
     def __init__(self, access_token: str, refresh_token: str, hass, entry):
-        """Initialize the Superloop API client."""
         self._access_token = access_token
         self._refresh_token = refresh_token
         self._hass = hass
         self._entry = entry
         self._session = aiohttp.ClientSession()
-        self._last_refresh = None
 
     async def async_close(self):
-        """Close the aiohttp session."""
+        """Close session."""
         if not self._session.closed:
             await self._session.close()
 
     async def async_get_services(self):
-        """Fetch user services from Superloop, handle token expiration."""
+        """Fetch user services."""
         headers = self._build_headers()
 
         try:
             async with async_timeout.timeout(10):
-                _LOGGER.debug("Making service request with token ending %s", self._access_token[-6:])
                 response = await self._session.get(f"{BASE_API_URL}/getServices/", headers=headers)
                 _LOGGER.debug("Superloop API getServices status: %s", response.status)
 
                 if response.status == 401:
-                    _LOGGER.warning("Access token expired. Attempting refresh...")
+                    _LOGGER.warning("Access token expired, refreshing...")
                     await self._try_refresh_token()
-
-                    # Retry once after refresh
                     headers = self._build_headers()
                     response = await self._session.get(f"{BASE_API_URL}/getServices/", headers=headers)
                     if response.status == 401:
-                        _LOGGER.error("Reauthentication failed even after refresh.")
                         raise ConfigEntryAuthFailed("Superloop reauthentication failed after refresh")
 
                 if response.status != 200:
-                    _LOGGER.error("Failed to fetch services: HTTP %s", response.status)
+                    _LOGGER.error("Failed to fetch services: %s", response.status)
                     raise SuperloopApiError("Failed to fetch services")
 
                 data = await response.json()
@@ -63,19 +56,42 @@ class SuperloopClient:
             _LOGGER.error("Timeout fetching services")
             raise SuperloopApiError("Timeout fetching services") from ex
 
-    async def _try_refresh_token(self):
-        """Try to refresh the access token. Raise ConfigEntryAuthFailed if it fails."""
-        now = time.time()
-        if self._last_refresh and (now - self._last_refresh) < 30:
-            _LOGGER.warning("Skipping refresh, last refresh was %.1f seconds ago", now - self._last_refresh)
-            raise ConfigEntryAuthFailed("Skipping spam refresh")
+    async def async_get_daily_usage(self, service_id: int, month: str, year: str):
+        """Fetch daily broadband usage."""
+        headers = self._build_headers()
+        url = f"{BASE_API_URL}/getBroadbandDailyUsage/{service_id}/{month}/{year}"
 
-        self._last_refresh = now
+        try:
+            async with async_timeout.timeout(10):
+                _LOGGER.debug("Fetching daily usage: service %s, month %s, year %s", service_id, month, year)
+                response = await self._session.get(url, headers=headers)
+
+                if response.status == 401:
+                    _LOGGER.warning("Token expired during daily usage fetch, refreshing...")
+                    await self._try_refresh_token()
+                    headers = self._build_headers()
+                    response = await self._session.get(url, headers=headers)
+                    if response.status == 401:
+                        raise ConfigEntryAuthFailed("Failed to refresh token during daily usage")
+
+                if response.status != 200:
+                    _LOGGER.error("Failed to fetch daily usage: HTTP %s", response.status)
+                    raise SuperloopApiError("Failed to fetch daily usage")
+
+                data = await response.json()
+                _LOGGER.debug("Daily usage response: %s", data)
+                return data
+
+        except asyncio.TimeoutError as ex:
+            _LOGGER.error("Timeout fetching daily usage")
+            raise SuperloopApiError("Timeout fetching daily usage") from ex
+
+    async def _try_refresh_token(self):
+        """Refresh access token."""
         payload = {"refresh_token": self._refresh_token}
 
         try:
             async with async_timeout.timeout(10):
-                _LOGGER.debug("Refreshing token with refresh_token ending %s", self._refresh_token[-6:])
                 response = await self._session.post(REFRESH_URL, json=payload)
 
                 if response.status != 200:
@@ -85,9 +101,8 @@ class SuperloopClient:
                 data = await response.json()
                 self._access_token = data["access_token"]
                 self._refresh_token = data["refresh_token"]
-                _LOGGER.info("Successfully refreshed access token ending %s", self._access_token[-6:])
+                _LOGGER.info("Successfully refreshed tokens")
 
-                # Save new tokens immediately to ConfigEntry
                 self._hass.config_entries.async_update_entry(
                     self._entry,
                     data={
@@ -98,10 +113,10 @@ class SuperloopClient:
 
         except asyncio.TimeoutError as ex:
             _LOGGER.error("Timeout refreshing token")
-            raise ConfigEntryAuthFailed("Timeout refreshing Superloop token") from ex
+            raise ConfigEntryAuthFailed("Timeout refreshing token") from ex
 
     def _build_headers(self):
-        """Helper to build auth headers."""
+        """Build auth headers."""
         return {
             "Authorization": f"Bearer {self._access_token}",
             "Origin": "https://superhub.superloop.com",
