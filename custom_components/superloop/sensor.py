@@ -29,7 +29,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
         # (Other regular sensors skipped for brevity...)
 
     # ⏳ Defer daily usage sensors to AFTER first daily data fetched
-    async def async_setup_daily_sensors(_):
+    async def async_setup_daily_sensors():
         if coordinator.daily_usage:
             _LOGGER.debug("Setting up Superloop Daily Usage sensors...")
             async_add_entities([
