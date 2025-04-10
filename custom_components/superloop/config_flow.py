@@ -45,7 +45,7 @@ class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 
             try:
                 self._access_token, self._refresh_token = await self._attempt_login(self._email, self._password)
-                await self._trigger_mfa_sms(self._access_token, self._mfa_method)
+                await self._trigger_mfa(self._access_token, self._mfa_method)
             except InvalidAuth:
                 return self.async_show_form(
                     step_id="user",
