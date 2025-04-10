@@ -1,7 +1,7 @@
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.const import UnitOfInformation
-
+from datetime import datetime
 from .const import DOMAIN
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -100,9 +100,14 @@ class SuperloopDailyUploadSensor(CoordinatorEntity, SensorEntity):
         daily = self.coordinator.daily_usage
         if not daily or "usageDaily" not in daily:
             return None
-        today = daily["usageDaily"][0]
-        upload = today[1].replace("GB", "").strip()
-        return float(upload)
+        
+        today_str = datetime.now().strftime("%d %b %Y")  # Example: '10 Apr 2025'
+        for day in daily["usageDaily"]:
+            if day[0] == today_str:
+                upload = day[1].replace("GB", "").strip()
+                return float(upload)
+        
+        return None
 
 class SuperloopDailyDownloadSensor(CoordinatorEntity, SensorEntity):
     """Daily Download Usage Sensor."""
@@ -122,9 +127,14 @@ class SuperloopDailyDownloadSensor(CoordinatorEntity, SensorEntity):
         daily = self.coordinator.daily_usage
         if not daily or "usageDaily" not in daily:
             return None
-        today = daily["usageDaily"][0]
-        download = today[2].replace("GB", "").strip()
-        return float(download)
+        
+        today_str = datetime.now().strftime("%d %b %Y")  # Example: '10 Apr 2025'
+        for day in daily["usageDaily"]:
+            if day[0] == today_str:
+                download = day[2].replace("GB", "").strip()
+                return float(download)
+        
+        return None
 
 class SuperloopDailyTotalSensor(CoordinatorEntity, SensorEntity):
     """Daily Total Usage Sensor."""
@@ -144,6 +154,11 @@ class SuperloopDailyTotalSensor(CoordinatorEntity, SensorEntity):
         daily = self.coordinator.daily_usage
         if not daily or "usageDaily" not in daily:
             return None
-        today = daily["usageDaily"][0]
-        total = today[3].replace("GB", "").strip()
-        return float(total)
+        
+        today_str = datetime.now().strftime("%d %b %Y")  # Example: '10 Apr 2025'
+        for day in daily["usageDaily"]:
+            if day[0] == today_str:
+                total = day[3].replace("GB", "").strip()
+                return float(total)
+        
+        return None
