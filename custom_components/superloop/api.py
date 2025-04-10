@@ -38,7 +38,12 @@ class SuperloopClient:
 
                 if response.status == 401:
                     _LOGGER.warning("Access token expired, refreshing...")
-                    await self._try_refresh_token()
+                    try:
+                        await self._try_refresh_token()
+                    except ConfigEntryAuthFailed as err:
+                        _LOGGER.error("Failed to refresh token, raising auth failed.")
+                        raise ConfigEntryAuthFailed("Token refresh failed") from err
+
                     headers = self._build_headers()
                     response = await self._session.get(f"{BASE_API_URL}/getServices/", headers=headers)
                     if response.status == 401:
