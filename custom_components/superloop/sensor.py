@@ -1,18 +1,20 @@
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.components.sensor import SensorEntity
-from homeassistant.const import UnitOfInformation
+from homeassistant.const import UnitOfDataRate, UnitOfInformation
 from datetime import datetime
+
 from .const import DOMAIN
 
 async def async_setup_entry(hass, entry, async_add_entities):
+    """Set up Superloop sensors."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
     sensors = []
 
     for service in coordinator.data.get('broadband', []):
         service_number = service["serviceNumber"]
 
-        # Existing Sensors
-        sensors.append(
+        # Existing sensors
+        sensors.extend([
             SuperloopSensor(
                 coordinator=coordinator,
                 service=service,
@@ -23,27 +25,115 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 device_class="data_size",
                 state_class="total_increasing",
                 value_key="usageSummary.totalBytes"
-            )
-        )
+            ),
+            SuperloopSensor(
+                coordinator=coordinator,
+                service=service,
+                description="Download Speed",
+                unique_id=f"superloop-{service_number}-speed",
+                unit_of_measurement=UnitOfDataRate.MEGABITS_PER_SECOND,
+                icon="mdi:speedometer",
+                device_class=None,
+                value_key="eveningSpeed"
+            ),
+            SuperloopSensor(
+                coordinator=coordinator,
+                service=service,
+                description="Plan",
+                unique_id=f"superloop-{service_number}-plan-title",
+                unit_of_measurement=None,
+                icon="mdi:label",
+                device_class=None,
+                value_key="planTitle"
+            ),
+            SuperloopSensor(
+                coordinator=coordinator,
+                service=service,
+                description="Billing Progress",
+                unique_id=f"superloop-{service_number}-billing-progress",
+                unit_of_measurement="%",
+                icon="mdi:calendar-clock",
+                device_class=None,
+                state_class="measurement",
+                value_key="billingCycleProgressPercentage"
+            ),
+            SuperloopSensor(
+                coordinator=coordinator,
+                service=service,
+                description="Plan Evening Speed",
+                unique_id=f"superloop-{service_number}-evening-speed",
+                unit_of_measurement=UnitOfDataRate.MEGABITS_PER_SECOND,
+                icon="mdi:speedometer-medium",
+                device_class=None,
+                value_key="eveningSpeed"
+            ),
+            SuperloopSensor(
+                coordinator=coordinator,
+                service=service,
+                description="Free Download Usage",
+                unique_id=f"superloop-{service_number}-free-download",
+                unit_of_measurement=UnitOfInformation.GIGABYTES,
+                icon="mdi:download",
+                device_class="data_size",
+                state_class="total_increasing",
+                value_key="freeDownload"
+            ),
+            SuperloopSensor(
+                coordinator=coordinator,
+                service=service,
+                description="Download Usage",
+                unique_id=f"superloop-{service_number}-nonfree-download",
+                unit_of_measurement=UnitOfInformation.GIGABYTES,
+                icon="mdi:download-off",
+                device_class="data_size",
+                state_class="total_increasing",
+                value_key="nonFreeDownload"
+            ),
+            SuperloopSensor(
+                coordinator=coordinator,
+                service=service,
+                description="Free Upload Usage",
+                unique_id=f"superloop-{service_number}-free-upload",
+                unit_of_measurement=UnitOfInformation.GIGABYTES,
+                icon="mdi:upload",
+                device_class="data_size",
+                state_class="total_increasing",
+                value_key="freeUpload"
+            ),
+            SuperloopSensor(
+                coordinator=coordinator,
+                service=service,
+                description="Upload Usage",
+                unique_id=f"superloop-{service_number}-nonfree-upload",
+                unit_of_measurement=UnitOfInformation.GIGABYTES,
+                icon="mdi:upload-off",
+                device_class="data_size",
+                state_class="total_increasing",
+                value_key="nonFreeUpload"
+            ),
+            SuperloopSensor(
+                coordinator=coordinator,
+                service=service,
+                description="Plan Allowance",
+                unique_id=f"superloop-{service_number}-plan-allowance",
+                unit_of_measurement=None,
+                icon="mdi:database",
+                device_class=None,
+                value_key="allowance"
+            ),
+        ])
 
-        # (Other regular sensors skipped for brevity...)
+    # ✨ NEW: Daily Usage Sensors
+    sensors.extend([
+        SuperloopDailySensor(coordinator, "upload"),
+        SuperloopDailySensor(coordinator, "download"),
+        SuperloopDailySensor(coordinator, "total"),
+    ])
 
-    # ⏳ Defer daily usage sensors to AFTER first daily data fetched
-    async def async_setup_daily_sensors():
-        if coordinator.daily_usage:
-            _LOGGER.debug("Setting up Superloop Daily Usage sensors...")
-            async_add_entities([
-                SuperloopDailyUploadSensor(coordinator),
-                SuperloopDailyDownloadSensor(coordinator),
-                SuperloopDailyTotalSensor(coordinator),
-            ], True)
-
-    coordinator.async_add_listener(lambda: hass.async_create_task(async_setup_daily_sensors()))
-    
     async_add_entities(sensors, True)
 
 class SuperloopSensor(CoordinatorEntity, SensorEntity):
-    """Representation of a regular Superloop sensor."""
+    """Representation of a Superloop regular sensor."""
 
     def __init__(self, coordinator, service, description, unique_id, unit_of_measurement, icon, device_class, value_key, state_class=None):
         super().__init__(coordinator)
@@ -67,13 +157,38 @@ class SuperloopSensor(CoordinatorEntity, SensorEntity):
         if not current_service:
             return None
 
-        if self._value_key == "usageSummary.totalBytes":
-            return round(current_service.get("usageSummary", {}).get("totalBytes", 0) / (1024 ** 3), 2)
+        try:
+            usage_summary = current_service.get("usageSummary", {})
+
+            if self._value_key.startswith("usageSummary."):
+                key = self._value_key.split(".")[1]
+                return round(usage_summary.get(key, 0) / (1024 ** 3), 2)
+
+            if self._value_key in ("freeDownload", "nonFreeDownload", "freeUpload", "nonFreeUpload"):
+                return round(usage_summary.get(self._value_key, 0) / (1024 ** 3), 2)
+
+            if self._value_key == "eveningSpeed":
+                speed_text = current_service.get("eveningSpeed", "")
+                return int(speed_text.split(" ")[0]) if speed_text else None
+
+            if self._value_key == "billingCycleProgressPercentage":
+                return current_service.get("billingCycleProgressPercentage", None)
+
+            if self._value_key == "planTitle":
+                return current_service.get("planTitle", None)
+
+            if self._value_key == "allowance":
+                return current_service.get("allowance", None)
+
+        except Exception as e:
+            _LOGGER.error("Error parsing Superloop sensor value: %s", e)
+            return None
 
         return None
 
     @property
     def device_info(self):
+        """Return the device info for grouping sensors."""
         return {
             "identifiers": {(DOMAIN, self._service["serviceNumber"])},
             "name": "Superloop Service",
@@ -82,83 +197,41 @@ class SuperloopSensor(CoordinatorEntity, SensorEntity):
             "entry_type": "service",
         }
 
-class SuperloopDailyUploadSensor(CoordinatorEntity, SensorEntity):
-    """Daily Upload Usage Sensor."""
+class SuperloopDailySensor(CoordinatorEntity, SensorEntity):
+    """Representation of Superloop Daily Upload/Download/Total usage."""
 
-    _attr_name = "Superloop Daily Upload Usage"
-    _attr_unique_id = "superloop-daily-upload"
-    _attr_native_unit_of_measurement = UnitOfInformation.GIGABYTES
-    _attr_icon = "mdi:upload"
-    _attr_device_class = "data_size"
-
-    def __init__(self, coordinator):
+    def __init__(self, coordinator, sensor_type):
         super().__init__(coordinator)
+        self._sensor_type = sensor_type
+        self._attr_icon = "mdi:chart-line"
+        self._attr_device_class = "data_size"
+        self._attr_native_unit_of_measurement = UnitOfInformation.GIGABYTES
+
+        if sensor_type == "upload":
+            self._attr_name = "Superloop Daily Upload Usage"
+            self._attr_unique_id = "superloop-daily-upload-usage"
+        elif sensor_type == "download":
+            self._attr_name = "Superloop Daily Download Usage"
+            self._attr_unique_id = "superloop-daily-download-usage"
+        elif sensor_type == "total":
+            self._attr_name = "Superloop Daily Total Usage"
+            self._attr_unique_id = "superloop-daily-total-usage"
 
     @property
     def native_value(self):
-        """Return today's upload GB."""
+        """Return today's upload/download/total GB usage."""
         daily = self.coordinator.daily_usage
         if not daily or "usageDaily" not in daily:
             return None
-        
-        today_str = datetime.now().strftime("%d %b %Y")  # Example: '10 Apr 2025'
+
+        today_str = datetime.now().strftime("%d %b %Y")  # Example: "10 Apr 2025"
         for day in daily["usageDaily"]:
             if day[0] == today_str:
-                upload = day[1].replace("GB", "").strip()
-                return float(upload)
-        
-        return None
+                if self._sensor_type == "upload":
+                    return float(day[1].replace("GB", "").strip())
+                elif self._sensor_type == "download":
+                    return float(day[2].replace("GB", "").strip())
+                elif self._sensor_type == "total":
+                    return float(day[3].replace("GB", "").strip())
 
-class SuperloopDailyDownloadSensor(CoordinatorEntity, SensorEntity):
-    """Daily Download Usage Sensor."""
-
-    _attr_name = "Superloop Daily Download Usage"
-    _attr_unique_id = "superloop-daily-download"
-    _attr_native_unit_of_measurement = UnitOfInformation.GIGABYTES
-    _attr_icon = "mdi:download"
-    _attr_device_class = "data_size"
-
-    def __init__(self, coordinator):
-        super().__init__(coordinator)
-
-    @property
-    def native_value(self):
-        """Return today's download GB."""
-        daily = self.coordinator.daily_usage
-        if not daily or "usageDaily" not in daily:
-            return None
-        
-        today_str = datetime.now().strftime("%d %b %Y")  # Example: '10 Apr 2025'
-        for day in daily["usageDaily"]:
-            if day[0] == today_str:
-                download = day[2].replace("GB", "").strip()
-                return float(download)
-        
-        return None
-
-class SuperloopDailyTotalSensor(CoordinatorEntity, SensorEntity):
-    """Daily Total Usage Sensor."""
-
-    _attr_name = "Superloop Daily Total Usage"
-    _attr_unique_id = "superloop-daily-total"
-    _attr_native_unit_of_measurement = UnitOfInformation.GIGABYTES
-    _attr_icon = "mdi:chart-line"
-    _attr_device_class = "data_size"
-
-    def __init__(self, coordinator):
-        super().__init__(coordinator)
-
-    @property
-    def native_value(self):
-        """Return today's total usage GB."""
-        daily = self.coordinator.daily_usage
-        if not daily or "usageDaily" not in daily:
-            return None
-        
-        today_str = datetime.now().strftime("%d %b %Y")  # Example: '10 Apr 2025'
-        for day in daily["usageDaily"]:
-            if day[0] == today_str:
-                total = day[3].replace("GB", "").strip()
-                return float(total)
-        
-        return None
+        return None  # No match for today
