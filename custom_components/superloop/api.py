@@ -62,8 +62,8 @@ class SuperloopClient:
         url = f"{BASE_API_URL}/getBroadbandDailyUsage/{service_id}/{month}/{year}"
 
         try:
+            _LOGGER.debug("Fetching daily usage - URL: %s", url)  # NEW clearer log
             async with async_timeout.timeout(10):
-                _LOGGER.debug("Fetching daily usage: service %s, month %s, year %s", service_id, month, year)
                 response = await self._session.get(url, headers=headers)
 
                 if response.status == 401:
@@ -85,6 +85,7 @@ class SuperloopClient:
         except asyncio.TimeoutError as ex:
             _LOGGER.error("Timeout fetching daily usage")
             raise SuperloopApiError("Timeout fetching daily usage") from ex
+
 
     async def _try_refresh_token(self):
         """Refresh access token."""
