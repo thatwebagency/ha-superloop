@@ -162,10 +162,10 @@ class SuperloopSensor(CoordinatorEntity, SensorEntity):
 
             if self._value_key.startswith("usageSummary."):
                 key = self._value_key.split(".")[1]
-                return round(usage_summary.get(key, 0) / (1024 ** 3), 2)
+                return round(usage_summary.get(key, 0) / 1_000_000_000, 2)
 
             if self._value_key in ("freeDownload", "nonFreeDownload", "freeUpload", "nonFreeUpload"):
-                return round(usage_summary.get(self._value_key, 0) / (1024 ** 3), 2)
+                return round(usage_summary.get(self._value_key, 0) / 1_000_000_000, 2)
 
             if self._value_key == "eveningSpeed":
                 speed_text = current_service.get("eveningSpeed", "")
