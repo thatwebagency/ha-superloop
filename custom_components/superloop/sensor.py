@@ -206,6 +206,7 @@ class SuperloopDailySensor(CoordinatorEntity, SensorEntity):
         self._attr_icon = "mdi:chart-line"
         self._attr_device_class = "data_size"
         self._attr_native_unit_of_measurement = UnitOfInformation.GIGABYTES
+        self._attr_state_class = "measurement"
 
         if sensor_type == "upload":
             self._attr_name = "Superloop Daily Upload Usage"
@@ -223,9 +224,16 @@ class SuperloopDailySensor(CoordinatorEntity, SensorEntity):
         daily = self.coordinator.daily_usage
         if not daily or "usageDaily" not in daily:
             return None
-        yesterday = daily["usageDaily"][0]  # <- yesterday's record
+        yesterday = daily["usageDaily"][0]  # ← 0 is yesterday now
         try:
-            upload_str = yesterday[1].replace("GB", "").strip()
-            return float(upload_str)
+            if self._sensor_type == "upload":
+                value_str = yesterday[1]
+            elif self._sensor_type == "download":
+                value_str = yesterday[2]
+            elif self._sensor_type == "total":
+                value_str = yesterday[3]
+            else:
+                return None
+            return float(value_str.replace("GB", "").strip())
         except (IndexError, ValueError):
             return None
