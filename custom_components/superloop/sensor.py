@@ -38,7 +38,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 SuperloopDailyTotalSensor(coordinator),
             ], True)
 
-    coordinator.async_add_listener(async_setup_daily_sensors)
+    coordinator.async_add_listener(lambda: hass.async_create_task(async_setup_daily_sensors()))
     
     async_add_entities(sensors, True)
 
