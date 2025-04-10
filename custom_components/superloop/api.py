@@ -2,6 +2,7 @@ import logging
 import aiohttp
 import async_timeout
 import asyncio
+import time
 
 from homeassistant.exceptions import ConfigEntryAuthFailed
 
@@ -22,6 +23,7 @@ class SuperloopClient:
         self._hass = hass
         self._entry = entry
         self._session = aiohttp.ClientSession()
+        self._last_refresh = None
 
     async def async_close(self):
         """Close the aiohttp session."""
@@ -34,20 +36,23 @@ class SuperloopClient:
 
         try:
             async with async_timeout.timeout(10):
+                _LOGGER.debug("Making service request with token ending %s", self._access_token[-6:])
                 response = await self._session.get(f"{BASE_API_URL}/getServices/", headers=headers)
                 _LOGGER.debug("Superloop API getServices status: %s", response.status)
 
                 if response.status == 401:
-                    _LOGGER.warning("Access token expired, trying refresh token...")
+                    _LOGGER.warning("Access token expired. Attempting refresh...")
                     await self._try_refresh_token()
-                    # After refresh, retry once
+
+                    # Retry once after refresh
                     headers = self._build_headers()
                     response = await self._session.get(f"{BASE_API_URL}/getServices/", headers=headers)
                     if response.status == 401:
+                        _LOGGER.error("Reauthentication failed even after refresh.")
                         raise ConfigEntryAuthFailed("Superloop reauthentication failed after refresh")
 
                 if response.status != 200:
-                    _LOGGER.error("Failed to fetch services: %s", response.status)
+                    _LOGGER.error("Failed to fetch services: HTTP %s", response.status)
                     raise SuperloopApiError("Failed to fetch services")
 
                 data = await response.json()
@@ -60,10 +65,17 @@ class SuperloopClient:
 
     async def _try_refresh_token(self):
         """Try to refresh the access token. Raise ConfigEntryAuthFailed if it fails."""
+        now = time.time()
+        if self._last_refresh and (now - self._last_refresh) < 30:
+            _LOGGER.warning("Skipping refresh, last refresh was %.1f seconds ago", now - self._last_refresh)
+            raise ConfigEntryAuthFailed("Skipping spam refresh")
+
+        self._last_refresh = now
         payload = {"refresh_token": self._refresh_token}
 
         try:
             async with async_timeout.timeout(10):
+                _LOGGER.debug("Refreshing token with refresh_token ending %s", self._refresh_token[-6:])
                 response = await self._session.post(REFRESH_URL, json=payload)
 
                 if response.status != 200:
@@ -73,9 +85,9 @@ class SuperloopClient:
                 data = await response.json()
                 self._access_token = data["access_token"]
                 self._refresh_token = data["refresh_token"]
-                _LOGGER.info("Successfully refreshed tokens")
+                _LOGGER.info("Successfully refreshed access token ending %s", self._access_token[-6:])
 
-                # Update Home Assistant config entry with new tokens
+                # Save new tokens immediately to ConfigEntry
                 self._hass.config_entries.async_update_entry(
                     self._entry,
                     data={
@@ -86,7 +98,7 @@ class SuperloopClient:
 
         except asyncio.TimeoutError as ex:
             _LOGGER.error("Timeout refreshing token")
-            raise ConfigEntryAuthFailed("Superloop refresh token timeout") from ex
+            raise ConfigEntryAuthFailed("Timeout refreshing Superloop token") from ex
 
     def _build_headers(self):
         """Helper to build auth headers."""
