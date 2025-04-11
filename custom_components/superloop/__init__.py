@@ -1,9 +1,10 @@
 import logging
+from datetime import time, timedelta
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
-from datetime import time
-from homeassistant.helpers.event import async_track_time_change
+from homeassistant.helpers.event import async_track_time_change, async_track_time_interval
 
 from .api import SuperloopClient, SuperloopApiError
 from .coordinator import SuperloopCoordinator
@@ -62,7 +63,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         minute=5,
         second=0,
     )
-    
+
+    # ✅ BACKGROUND SILENT REFRESH SETUP
+    async def _background_refresh_tokens(now):
+        """Periodic background check to refresh token before expiry."""
+        _LOGGER.debug("Checking if token refresh is needed...")
+        await client.async_check_and_refresh_token_if_needed()
+
+    # Every 10 minutes, check if we need to refresh token
+    async_track_time_interval(
+        hass,
+        _background_refresh_tokens,
+        timedelta(minutes=10),
+    )
+
     return True
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
