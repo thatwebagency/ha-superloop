@@ -22,7 +22,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     access_token = entry.data["access_token"]
     refresh_token = entry.data["refresh_token"]
-    expires_in = entry.data.get["expires_in"]
+    expires_in = entry.data.get("expires_in")
 
     client = SuperloopClient(
         access_token=access_token,
@@ -36,7 +36,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     try:
         await coordinator.async_config_entry_first_refresh()
-        await coordinator.async_update_daily_usage()  # 🆕 Daily usage fetch at startup
+        await coordinator.async_update_daily_usage()
+    except ConfigEntryAuthFailed as err:
+        _LOGGER.error("Authentication failed during setup: %s", err)
+        raise ConfigEntryAuthFailed from err
     except SuperloopApiError as err:
         _LOGGER.error("Failed to connect to Superloop API: %s", err)
         raise ConfigEntryNotReady from err
