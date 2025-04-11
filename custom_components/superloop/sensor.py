@@ -208,6 +208,7 @@ class SuperloopDailySensor(CoordinatorEntity, SensorEntity):
         self._attr_native_unit_of_measurement = UnitOfInformation.GIGABYTES
         self._attr_state_class = "total"
         self._last_reset = None
+        self._last_value = 0  # 👈 store last known good value
 
         if sensor_type == "upload":
             self._attr_name = "Superloop Daily Upload Usage"
@@ -224,10 +225,10 @@ class SuperloopDailySensor(CoordinatorEntity, SensorEntity):
         """Return yesterday's upload/download/total GB usage."""
         daily = self.coordinator.daily_usage
         if not daily or "usageDaily" not in daily:
-            return None
+            return self._last_value  # 👈 use last known value if no data
+
         yesterday = daily["usageDaily"][0]
         try:
-            # Set _last_reset from yesterday date
             if not self._last_reset:
                 date_obj = datetime.strptime(yesterday[0], "%d %b %Y")
                 self._last_reset = date_obj.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -239,9 +240,12 @@ class SuperloopDailySensor(CoordinatorEntity, SensorEntity):
             elif self._sensor_type == "total":
                 value = yesterday[3].replace("GB", "").strip()
 
-            return float(value)
+            value_float = float(value)
+            self._last_value = value_float  # 👈 update last known good value
+            return value_float
+
         except (IndexError, ValueError):
-            return None
+            return self._last_value  # 👈 fallback if parsing fails
 
     @property
     def last_reset(self):
