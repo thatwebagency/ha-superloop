@@ -27,8 +27,8 @@ trigger:
 condition:
   - condition: template
     value_template: >
-      {% set usage = states(usage_sensor) %}
-      {% set allowance = states(allowance_sensor) %}
+      {% set usage = states(input.usage_sensor) %}
+      {% set allowance = states(input.allowance_sensor) %}
       {% if not usage or not allowance %}
         false
       {% elif 'Unlimited Data' in allowance %}
