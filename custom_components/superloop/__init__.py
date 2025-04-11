@@ -22,7 +22,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     access_token = entry.data["access_token"]
     refresh_token = entry.data["refresh_token"]
-    expires_in = entry.data["expires_in"]
+    expires_in = entry.data.get["expires_in"]
 
     client = SuperloopClient(
         access_token=access_token,
