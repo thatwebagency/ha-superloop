@@ -16,13 +16,16 @@ class SuperloopApiError(Exception):
     pass
 
 class SuperloopClient:
-    def __init__(self, access_token: str, refresh_token: str, hass, entry):
+    def __init__(self, access_token: str, refresh_token: str, hass, entry, expires_in: int = None):
         self._access_token = access_token
         self._refresh_token = refresh_token
         self._hass = hass
         self._entry = entry
         self._session = aiohttp.ClientSession()
-        self._token_expiry_time = None  # Will be set after first refresh/login
+        if expires_in:
+            self._token_expiry_time = datetime.utcnow() + timedelta(seconds=expires_in)
+        else:
+            self._token_expiry_time = None
 
     async def async_close(self):
         """Close session."""

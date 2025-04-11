@@ -44,7 +44,7 @@ class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._mfa_method = "MfaOverSMS"
                 
             try:
-                self._access_token, self._refresh_token = await self._attempt_login(self._email, self._password)
+                self._access_token, self._refresh_token, self._expires_in = await self._attempt_login(self._email, self._password)
                 await self._trigger_mfa(self._access_token, self._mfa_method)
             except InvalidAuth:
                 return self.async_show_form(
@@ -94,6 +94,7 @@ class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     data={
                         "access_token": self._access_token,
                         "refresh_token": self._refresh_token,
+                        "expires_in": self._expires_in,
                     },
                 )
                 await self.hass.config_entries.async_reload(self._reauth_entry.entry_id)
@@ -105,6 +106,7 @@ class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 data={
                     "access_token": self._access_token,
                     "refresh_token": self._refresh_token,
+                    "expires_in": self._expires_in,
                 },
             )
 
@@ -142,7 +144,7 @@ class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         raise InvalidAuth()
 
                     data = await response.json()
-                    return data["access_token"], data["refresh_token"]
+                    return data["access_token"], data["refresh_token"], data.get("expires_in", 14400)  # default to 4h if missing
         except asyncio.TimeoutError as ex:
             raise CannotConnect() from ex
 
