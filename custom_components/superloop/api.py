@@ -45,7 +45,7 @@ class SuperloopClient:
         headers = self._build_headers()
 
         try:
-            async with async_timeout.timeout(10):
+            async with async_timeout.timeout(30):
                 response = await self._session.get(f"{BASE_API_URL}/getServices/", headers=headers)
                 _LOGGER.debug("Superloop API getServices status: %s", response.status)
 
@@ -114,17 +114,21 @@ class SuperloopClient:
         payload = {"refresh_token": self._refresh_token}
 
         try:
-            async with async_timeout.timeout(10):
+            async with async_timeout.timeout(30):
                 response = await self._session.post(REFRESH_URL, json=payload)
 
+                if response.status == 401:
+                    _LOGGER.error("Refresh token invalid, reauthentication needed.")
+                    raise ConfigEntryAuthFailed("Superloop refresh token invalid (401 Unauthorized)")
+
                 if response.status != 200:
-                    _LOGGER.error("Failed to refresh token (status %s)", response.status)
-                    raise ConfigEntryAuthFailed("Superloop refresh token invalid")
+                    _LOGGER.error("Failed to refresh token (HTTP %s)", response.status)
+                    raise SuperloopApiError(f"Failed to refresh token: HTTP {response.status}")
 
                 data = await response.json()
                 self._access_token = data["access_token"]
                 self._refresh_token = data["refresh_token"]
-                expires_in = data.get("expires_in", 14400)  # default to 4h if missing
+                expires_in = data.get("expires_in", 14400)
                 self._token_expiry_time = datetime.utcnow() + timedelta(seconds=expires_in)
 
                 _LOGGER.info("Successfully refreshed tokens")
@@ -134,12 +138,14 @@ class SuperloopClient:
                     data={
                         "access_token": self._access_token,
                         "refresh_token": self._refresh_token,
+                        "expires_in": expires_in,
                     }
                 )
 
         except asyncio.TimeoutError as ex:
             _LOGGER.error("Timeout refreshing token")
-            raise ConfigEntryAuthFailed("Timeout refreshing token") from ex
+            raise SuperloopApiError("Timeout refreshing token") from ex
+
 
     async def async_check_and_refresh_token_if_needed(self):
         """Check if access token is close to expiry and refresh if needed."""
