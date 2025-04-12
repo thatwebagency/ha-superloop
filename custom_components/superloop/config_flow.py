@@ -13,7 +13,6 @@ _LOGGER = logging.getLogger(__name__)
 DOMAIN = "superloop"
 
 LOGIN_URL = "https://webservices.myexetel.exetel.com.au/api/auth/token"
-OAUTH_EXCHANGE_URL = "https://experience-apigw.superloop.com/api/v1/oauth/token"
 MFA_URL = "https://webservices-api.superloop.com/v1/mfa"
 CREATE_MFA_URL = "https://webservices-api.superloop.com/v1/create-mfa"
 VERIFY_MFA_URL = "https://webservices-api.superloop.com/v1/verify-mfa"
@@ -29,24 +28,23 @@ class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._password = None
         self._access_token = None
         self._refresh_token = None
-        self._expires_in = None
         self._mfa_method = "MfaOverSMS"
-
+        
     async def async_step_user(self, user_input=None):
         if user_input is not None:
             self._email = user_input["email"]
             self._password = user_input["password"]
             mfa_method = user_input.get("mfa_method", "sms")
-
+            
             if mfa_method == "sms":
                 self._mfa_method = "MfaOverSMS"
             elif mfa_method == "email":
                 self._mfa_method = "MfaOverEmail"
             else:
                 self._mfa_method = "MfaOverSMS"
-
+                
             try:
-                self._access_token, self._refresh_token, self._expires_in = await self._full_login_flow(self._email, self._password)
+                self._access_token, self._refresh_token, self._expires_in = await self._attempt_login(self._email, self._password)
                 await self._trigger_mfa(self._access_token, self._mfa_method)
             except InvalidAuth:
                 return self.async_show_form(
@@ -125,12 +123,12 @@ class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle a reauthentication flow."""
         _LOGGER.debug("Starting Superloop reauthentication flow")
         self._reauth_entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
-        self._email = self._reauth_entry.title
+        self._email = self._reauth_entry.title  # preload email if possible
 
         return await self.async_step_user()
 
-    async def _full_login_flow(self, email: str, password: str):
-        """Handle full login flow including token exchange."""
+    async def _attempt_login(self, email: str, password: str):
+        """Send login request and return tokens."""
         payload = {
             "username": email,
             "password": password,
@@ -145,30 +143,8 @@ class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     if response.status != 200:
                         raise InvalidAuth()
 
-                    initial_data = await response.json()
-
-                    # Immediately exchange token for superhub access
-                    oauth_payload = {
-                        "username": email,
-                        "token": initial_data["access_token"],
-                        "token_type": "superhub_access_token",
-                        "scope": "access-superhub",
-                    }
-
-                    response = await session.post(OAUTH_EXCHANGE_URL, json=oauth_payload)
-                    if response.status != 200:
-                        _LOGGER.error("Failed during OAuth token exchange, status: %s", response.status)
-                        raise InvalidAuth()
-
-                    final_data = await response.json()
-                    _LOGGER.debug("Final OAuth login token received: %s", final_data)
-
-                    return (
-                        final_data["access_token"],
-                        final_data["refresh_token"],
-                        final_data.get("expires_in", 14400)
-                    )
-
+                    data = await response.json()
+                    return data["access_token"], data["refresh_token"], data.get("expires_in", 14400)  # default to 4h if missing
         except asyncio.TimeoutError as ex:
             raise CannotConnect() from ex
 

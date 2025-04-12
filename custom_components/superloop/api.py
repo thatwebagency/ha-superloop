@@ -161,8 +161,8 @@ class SuperloopClient:
             _LOGGER.warning("Token expiry time not set, skipping silent refresh check.")
             return
 
-        # If less than 10 minutes remaining, refresh proactively
-        if (self._token_expiry_time - now) < timedelta(hours=2):
+        # If less than 3.5 hours remaining, refresh proactively
+        if (self._token_expiry_time - now) < timedelta(minutes=210):
             _LOGGER.info("Access token nearing expiry, refreshing proactively.")
             try:
                 await self._try_refresh_token()
