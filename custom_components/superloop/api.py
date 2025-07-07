@@ -65,10 +65,10 @@ class SuperloopClient:
                     response = await self._session.get(f"{BASE_API_URL}/getServices/", headers=headers)
                     status = response.status
                     _LOGGER.debug("Retry getServices status: %s", status)
-                    
-                    if status == 401:
-                        _LOGGER.error("Still getting 401 after token refresh, authentication failed.")
-                        raise ConfigEntryAuthFailed("Superloop reauthentication failed after refresh")
+
+                    if status in [401, 403]:
+                        _LOGGER.error("Still getting %s after token refresh, triggering reauthentication.", status)
+                        raise ConfigEntryAuthFailed("Superloop token invalid after refresh")
 
                 if status != 200:
                     response_text = await response.text()
@@ -86,6 +86,7 @@ class SuperloopClient:
         except Exception as ex:
             _LOGGER.exception("Unexpected error fetching services: %s", str(ex))
             raise
+
 
     async def async_get_daily_usage(self, service_id: int):
         """Fetch daily broadband usage."""
