@@ -21,7 +21,7 @@ blueprint:
         entity:
           domain: sensor
 
-trigger_variables:
+variables:
   # expose your inputs as simple vars
   usage_sensor: !input usage_sensor
   allowance_sensor: !input allowance_sensor
@@ -29,26 +29,15 @@ trigger_variables:
 trigger:
   - platform: state
     # fire on ANY change to your usage sensor
-    entity_id: "{{ usage_sensor }}"
+    entity_id: !input usage_sensor
 
 condition:
   # 1) skip if your plan is Unlimited Data
   - condition: not
     conditions:
       - condition: state
-        entity_id: "{{ allowance_sensor }}"
+        entity_id: !input allowance_sensor
         state: "Unlimited Data"
-
-  # 2) skip if usage hasn’t populated yet
-  - condition: template
-    value_template: >
-      {{ states(usage_sensor) not in ['unavailable', 'unknown'] }}
-
-  # 3) skip if allowance hasn’t populated yet
-  - condition: template
-    value_template: >
-      {{ states(allowance_sensor) not in ['unavailable', 'unknown'] }}
-
   # 4) only proceed when usage ≥ 90% of allowance
   - condition: template
     value_template: >
