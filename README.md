@@ -14,6 +14,7 @@
   <li>📦 <strong>Plan Allowance</strong> (e.g., "Unlimited Data" or "500 GB")</li>
   <li>🗓️ <strong>Billing Cycle Dates</strong></li>
   <li>⚡ <strong>Automatic Refreshing</strong> and <strong>Silent Re-Authentication</strong></li>
+  <li><strong>NEW - Speed Boost Status</strong> Now you can see at a glance if speed boost is active on your service</li>
 </ul>
 
 <hr>
