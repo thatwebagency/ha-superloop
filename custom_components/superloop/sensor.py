@@ -1,3 +1,4 @@
+import logging
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.const import UnitOfDataRate, UnitOfInformation
@@ -5,14 +6,20 @@ from datetime import datetime
 
 from .const import DOMAIN
 
+_LOGGER = logging.getLogger(__name__)
+
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up Superloop sensors."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
     sensors = []
 
+    _LOGGER.debug("Setting up Superloop sensors with %s broadband services", 
+                 len(coordinator.data.get('broadband', [])))
+
     for service in coordinator.data.get('broadband', []):
         service_number = service["serviceNumber"]
-        
+        _LOGGER.debug("Setting up sensors for service %s (speedboost: %s)", 
+                     service_number, service.get("speedboost", False))
 
         # Existing sensors
         sensors.extend([
