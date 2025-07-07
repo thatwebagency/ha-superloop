@@ -5,6 +5,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady, ConfigEntryAuthFailed
 from homeassistant.helpers.event import async_track_time_change, async_track_time_interval
+from homeassistant.core import ServiceCall
 
 from .api import SuperloopClient, SuperloopApiError
 from .coordinator import SuperloopCoordinator
@@ -68,6 +69,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         minute=5,
         second=0,
     )
+
+    async def async_refresh_data_service(call: ServiceCall) -> None:
+        """Handle refresh data service call."""
+        _LOGGER.debug("Manual refresh data service called")
+        await coordinator.async_refresh()
+        _LOGGER.info("Superloop data refreshed manually")
+
+    async def async_refresh_token_service(call: ServiceCall) -> None:
+        """Handle refresh token service call."""
+        _LOGGER.debug("Manual refresh token service called")
+        try:
+            await client.async_check_and_refresh_token_if_needed(force=True)
+            _LOGGER.info("Superloop token refreshed manually")
+        except Exception as err:
+            _LOGGER.error("Failed to manually refresh token: %s", err)
+
+    # Register the services
+    hass.services.async_register(
+        DOMAIN, "refresh_data", async_refresh_data_service
+    )
+    hass.services.async_register(
+        DOMAIN, "refresh_token", async_refresh_token_service
+    )
+
+    return True
 
     # ✅ BACKGROUND SILENT REFRESH SETUP
     async def _background_refresh_tokens(now):

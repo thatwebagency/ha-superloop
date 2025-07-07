@@ -1,4 +1,8 @@
 # Superloop Services
 refresh_data:
   name: Refresh Data
-  description: Refresh the Superloop data from the API
+  description: Manually refresh the Superloop data from the API
+  
+refresh_token:
+  name: Refresh Token
+  description: Manually refresh the Superloop authentication token

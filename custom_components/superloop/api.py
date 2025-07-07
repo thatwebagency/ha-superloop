@@ -179,13 +179,21 @@ class SuperloopClient:
             _LOGGER.exception("Unexpected error during token refresh: %s", str(ex))
             raise
 
-    async def async_check_and_refresh_token_if_needed(self):
+    async def async_check_and_refresh_token_if_needed(self, force=False):
         """Check if access token is close to expiry and refresh if needed."""
         now = datetime.utcnow()
 
         if self._token_expiry_time is None:
             _LOGGER.warning("Token expiry time not set, skipping silent refresh check.")
-            return
+            if force:
+                _LOGGER.info("Force refresh requested, attempting to refresh token.")
+                try:
+                    await self._try_refresh_token()
+                    return True
+                except Exception as ex:
+                    _LOGGER.error("Force refresh failed: %s", str(ex))
+                    return False
+            return False
 
         # Calculate time remaining
         time_remaining = self._token_expiry_time - now
@@ -193,15 +201,23 @@ class SuperloopClient:
                     time_remaining.total_seconds() / 60)
 
         # If less than 3.5 hours remaining, refresh proactively
-        if time_remaining < timedelta(minutes=210):
-            _LOGGER.info("Access token nearing expiry (%s minutes remaining), refreshing proactively.", 
-                        time_remaining.total_seconds() / 60)
+        if force or time_remaining < timedelta(minutes=210):
+            if force:
+                _LOGGER.info("Forced token refresh requested")
+            else:
+                _LOGGER.info("Access token nearing expiry (%s minutes remaining), refreshing proactively.", 
+                            time_remaining.total_seconds() / 60)
             try:
                 await self._try_refresh_token()
+                return True
             except ConfigEntryAuthFailed:
-                _LOGGER.error("Proactive token refresh failed, reauthentication needed soon.")
+                _LOGGER.error("Token refresh failed, reauthentication needed.")
+                return False
             except Exception as ex:
-                _LOGGER.exception("Unexpected error during proactive token refresh: %s", str(ex))
+                _LOGGER.exception("Unexpected error during token refresh: %s", str(ex))
+                return False
+        
+        return False  # No refresh needed
 
     @property
     def access_token(self) -> str:
