@@ -52,8 +52,8 @@ class SuperloopClient:
                 status = response.status
                 _LOGGER.debug("Superloop API getServices status: %s", status)
 
-                if status == 401:
-                    _LOGGER.warning("Access token expired (HTTP 401), trying to refresh...")
+                if status in [401, 403]:
+                    _LOGGER.warning("Access token expired or unauthorized (HTTP %s), trying to refresh...", status)
                     try:
                         await self._try_refresh_token()
                     except ConfigEntryAuthFailed as err:
