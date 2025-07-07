@@ -12,6 +12,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     for service in coordinator.data.get('broadband', []):
         service_number = service["serviceNumber"]
+        _LOGGER.debug("Setting up sensors for service %s (speedboost: %s)", 
+                     service_number, service.get("speedboost", False))
 
         # Existing sensors
         sensors.extend([
@@ -121,6 +123,16 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 device_class=None,
                 value_key="allowance"
             ),
+            SuperloopSensor(
+                coordinator=coordinator,
+                service=service,
+                description="Speed Boost",
+                unique_id=f"superloop-{service_number}-speedboost",
+                unit_of_measurement=None,
+                icon="mdi:rocket",  # Rocket icon for speed boost
+                device_class=None,
+                value_key="speedboost"
+            ),
         ])
 
     # ✨ NEW: Daily Usage Sensors
@@ -179,6 +191,10 @@ class SuperloopSensor(CoordinatorEntity, SensorEntity):
 
             if self._value_key == "allowance":
                 return current_service.get("allowance", None)
+            
+            if self._value_key == "speedboost":
+                return current_service.get("speedboost", False)
+                
 
         except Exception as e:
             _LOGGER.error("Error parsing Superloop sensor value: %s", e)
