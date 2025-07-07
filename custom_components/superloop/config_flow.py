@@ -17,7 +17,6 @@ MFA_URL = "https://webservices-api.superloop.com/v1/mfa"
 CREATE_MFA_URL = "https://webservices-api.superloop.com/v1/create-mfa"
 VERIFY_MFA_URL = "https://webservices-api.superloop.com/v1/verify-mfa"
 
-
 class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Superloop."""
 
@@ -29,23 +28,23 @@ class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._password = None
         self._access_token = None
         self._refresh_token = None
-        self._expires_in = None
         self._mfa_method = "MfaOverSMS"
-
+        
     async def async_step_user(self, user_input=None):
-        """First step: collect email, password and start MFA."""
         if user_input is not None:
             self._email = user_input["email"]
             self._password = user_input["password"]
             mfa_method = user_input.get("mfa_method", "sms")
-            self._mfa_method = "MfaOverSMS" if mfa_method == "sms" else "MfaOverEmail"
-
+            
+            if mfa_method == "sms":
+                self._mfa_method = "MfaOverSMS"
+            elif mfa_method == "email":
+                self._mfa_method = "MfaOverEmail"
+            else:
+                self._mfa_method = "MfaOverSMS"
+                
             try:
-                # Initial login to get one-time MFA tokens
-                self._access_token, self._refresh_token, self._expires_in = await self._attempt_login(
-                    self._email, self._password
-                )
-                # Trigger the MFA challenge (SMS or email)
+                self._access_token, self._refresh_token, self._expires_in = await self._attempt_login(self._email, self._password)
                 await self._trigger_mfa(self._access_token, self._mfa_method)
             except InvalidAuth:
                 return self.async_show_form(
@@ -60,24 +59,27 @@ class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             return await self.async_step_2fa()
 
-        data_schema = vol.Schema(
-            {
-                vol.Required("email"): str,
-                vol.Required("password"): str,
-                vol.Required("mfa_method", default="sms"): vol.In(
-                    {"sms": "SMS (Text Message)", "email": "Email"}
-                ),
-            }
+        return self.async_show_form(
+            step_id="user",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("email"): str,
+                    vol.Required("password"): str,
+                    vol.Required("mfa_method", default="sms"): vol.In(
+                        {
+                            "sms": "SMS (Text Message)",
+                            "email": "Email",
+                        }
+                    ),
+                }
+            ),
         )
-        return self.async_show_form(step_id="user", data_schema=data_schema)
 
     async def async_step_2fa(self, user_input=None):
-        """Second step: verify the MFA code and finish authentication."""
         if user_input is not None:
             code = user_input["code"]
 
             try:
-                # Verify OTP and update tokens to the real session ones
                 await self._verify_2fa_code(self._access_token, code, self._mfa_method)
             except InvalidAuth:
                 return self.async_show_form(
@@ -85,8 +87,8 @@ class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     errors={"base": "invalid_2fa"},
                 )
 
-            # If this was a re-auth flow, update the existing entry
             if self._reauth_entry:
+                # Reauth flow
                 self.hass.config_entries.async_update_entry(
                     self._reauth_entry,
                     data={
@@ -95,12 +97,10 @@ class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         "expires_in": self._expires_in,
                     },
                 )
-                await self.hass.config_entries.async_reload(
-                    self._reauth_entry.entry_id
-                )
+                await self.hass.config_entries.async_reload(self._reauth_entry.entry_id)
                 return self.async_abort(reason="reauth_successful")
 
-            # Normal flow: create a new entry with the final tokens
+            # Normal new flow
             return self.async_create_entry(
                 title=self._email,
                 data={
@@ -110,21 +110,25 @@ class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 },
             )
 
-        # Show the form to input the MFA code
-        data_schema = vol.Schema({vol.Required("code"): str})
-        return self.async_show_form(step_id="2fa", data_schema=data_schema)
+        return self.async_show_form(
+            step_id="2fa",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("code"): str,
+                }
+            ),
+        )
 
     async def async_step_reauth(self, entry_data):
         """Handle a reauthentication flow."""
         _LOGGER.debug("Starting Superloop reauthentication flow")
-        self._reauth_entry = self.hass.config_entries.async_get_entry(
-            self.context["entry_id"]
-        )
-        self._email = self._reauth_entry.title
+        self._reauth_entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
+        self._email = self._reauth_entry.title  # preload email if possible
+
         return await self.async_step_user()
 
     async def _attempt_login(self, email: str, password: str):
-        """Send login request and return initial tokens for MFA."""
+        """Send login request and return tokens."""
         payload = {
             "username": email,
             "password": password,
@@ -138,63 +142,40 @@ class SuperloopConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     response = await session.post(LOGIN_URL, json=payload)
                     if response.status != 200:
                         raise InvalidAuth()
+
                     data = await response.json()
-                    return (
-                        data["access_token"],
-                        data["refresh_token"],
-                        data.get("expires_in", 14400),
-                    )
+                    return data["access_token"], data["refresh_token"], data.get("expires_in", 14400)  # default to 4h if missing
         except asyncio.TimeoutError as ex:
             raise CannotConnect() from ex
 
     async def _trigger_mfa(self, access_token: str, mfa_action: str):
-        """Trigger MFA delivery (SMS or email)."""
+        """Trigger MFA after login."""
         headers = {"Authorization": f"Bearer {access_token}"}
+
         try:
             async with aiohttp.ClientSession() as session:
                 async with async_timeout.timeout(10):
-                    # Initiate MFA
                     await session.get(MFA_URL, headers=headers)
-                    await session.post(
-                        CREATE_MFA_URL,
-                        json={"action": mfa_action},
-                        headers=headers,
-                    )
+                    await session.post(CREATE_MFA_URL, json={"action": mfa_action}, headers=headers)
         except asyncio.TimeoutError as ex:
             raise CannotConnect() from ex
 
     async def _verify_2fa_code(self, access_token: str, code: str, mfa_action: str):
-        """Verify the entered 2FA code and store final session tokens."""
+        """Verify the entered 2FA code."""
         headers = {"Authorization": f"Bearer {access_token}"}
         payload = {"action": mfa_action, "token": code}
 
         try:
             async with aiohttp.ClientSession() as session:
                 async with async_timeout.timeout(10):
-                    response = await session.post(
-                        VERIFY_MFA_URL, json=payload, headers=headers
-                    )
+                    response = await session.post(VERIFY_MFA_URL, json=payload, headers=headers)
                     if response.status != 200:
                         raise InvalidAuth()
-
-                    data = await response.json()
-                    # Overwrite with the real tokens
-                    self._access_token = data.get(
-                        "token"
-                    ) or data.get("access_token") or data.get("exchangeAccessToken")
-                    self._refresh_token = data.get(
-                        "refreshToken"
-                    ) or data.get("refresh_token")
-                    self._expires_in = data.get("expiresIn") or data.get(
-                        "expires_in", self._expires_in
-                    )
         except asyncio.TimeoutError as ex:
             raise CannotConnect() from ex
 
-
 class CannotConnect(HomeAssistantError):
     """Error to indicate we cannot connect."""
-
 
 class InvalidAuth(HomeAssistantError):
     """Error to indicate invalid authentication."""
