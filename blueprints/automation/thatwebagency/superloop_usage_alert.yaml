@@ -5,7 +5,6 @@ blueprint:
     data usage reaches 90% of your plan allowance.
     Skips plans with “Unlimited Data.”
   domain: automation
-  version: 1
 
   input:
     usage_sensor:
