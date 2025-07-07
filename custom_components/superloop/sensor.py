@@ -12,8 +12,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     for service in coordinator.data.get('broadband', []):
         service_number = service["serviceNumber"]
-        _LOGGER.debug("Setting up sensors for service %s (speedboost: %s)", 
-                     service_number, service.get("speedboost", False))
+        
 
         # Existing sensors
         sensors.extend([
