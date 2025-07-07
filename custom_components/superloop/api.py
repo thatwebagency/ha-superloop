@@ -43,14 +43,17 @@ class SuperloopClient:
     async def async_get_services(self):
         """Fetch user services."""
         headers = self._build_headers()
+        _LOGGER.debug("Fetching services with access token: %s...", self._access_token[:10] if self._access_token else None)
 
         try:
             async with async_timeout.timeout(30):
+                _LOGGER.debug("Making GET request to %s", f"{BASE_API_URL}/getServices/")
                 response = await self._session.get(f"{BASE_API_URL}/getServices/", headers=headers)
-                _LOGGER.debug("Superloop API getServices status: %s", response.status)
+                status = response.status
+                _LOGGER.debug("Superloop API getServices status: %s", status)
 
-                if response.status == 401:
-                    _LOGGER.warning("Access token expired, trying to refresh...")
+                if status == 401:
+                    _LOGGER.warning("Access token expired (HTTP 401), trying to refresh...")
                     try:
                         await self._try_refresh_token()
                     except ConfigEntryAuthFailed as err:
@@ -58,21 +61,31 @@ class SuperloopClient:
                         raise ConfigEntryAuthFailed("Token refresh failed") from err
 
                     headers = self._build_headers()
+                    _LOGGER.debug("Retrying GET request with new token: %s...", self._access_token[:10] if self._access_token else None)
                     response = await self._session.get(f"{BASE_API_URL}/getServices/", headers=headers)
-                    if response.status == 401:
+                    status = response.status
+                    _LOGGER.debug("Retry getServices status: %s", status)
+                    
+                    if status == 401:
+                        _LOGGER.error("Still getting 401 after token refresh, authentication failed.")
                         raise ConfigEntryAuthFailed("Superloop reauthentication failed after refresh")
 
-                if response.status != 200:
-                    _LOGGER.error("Failed to fetch services: %s", response.status)
-                    raise SuperloopApiError("Failed to fetch services")
+                if status != 200:
+                    response_text = await response.text()
+                    _LOGGER.error("Failed to fetch services: HTTP %s, Response: %s", status, response_text[:200])
+                    raise SuperloopApiError(f"Failed to fetch services: HTTP {status}")
 
                 data = await response.json()
-                _LOGGER.debug("Superloop API getServices response: %s", data)
+                _LOGGER.debug("Superloop API getServices response: %s broadband services", 
+                            len(data.get("broadband", [])))
                 return data
 
         except asyncio.TimeoutError as ex:
             _LOGGER.error("Timeout fetching services")
             raise SuperloopApiError("Timeout fetching services") from ex
+        except Exception as ex:
+            _LOGGER.exception("Unexpected error fetching services: %s", str(ex))
+            raise
 
     async def async_get_daily_usage(self, service_id: int):
         """Fetch daily broadband usage."""
@@ -112,46 +125,59 @@ class SuperloopClient:
     async def _try_refresh_token(self):
         """Refresh access token."""
         payload = {"refresh_token": self._refresh_token}
-        _LOGGER.debug("Sending refresh payload: %s", payload)
-    
+        _LOGGER.debug("Sending refresh payload to %s: %s", REFRESH_URL, {"refresh_token": "***"})
+
         try:
             async with async_timeout.timeout(10):
+                _LOGGER.debug("Making token refresh POST request")
                 response = await self._session.post(REFRESH_URL, json=payload)
-                _LOGGER.debug("Refresh HTTP status: %s", response.status)
+                status = response.status
+                _LOGGER.debug("Token refresh HTTP status: %s", status)
                 
                 resp_text = await response.text()
-                _LOGGER.debug("Refresh response body: %s", resp_text)
-    
-                if response.status == 401:
+                _LOGGER.debug("Token refresh response body (first 100 chars): %s...", resp_text[:100] if len(resp_text) > 100 else resp_text)
+
+                if status == 401:
                     _LOGGER.error("Refresh token invalid, received 401 Unauthorized.")
                     raise ConfigEntryAuthFailed("Superloop refresh token invalid (401 Unauthorized)")
-    
-                if response.status != 200:
-                    _LOGGER.error("Failed to refresh token (HTTP %s)", response.status)
-                    raise SuperloopApiError(f"Failed to refresh token: HTTP {response.status}")
-    
-                data = await response.json()
-                self._access_token = data["access_token"]
-                self._refresh_token = data["refresh_token"]
-                expires_in = data.get("expires_in", 14400)
-                self._token_expiry_time = datetime.utcnow() + timedelta(seconds=expires_in)
-    
-                _LOGGER.info("Successfully refreshed tokens")
-    
-                self._hass.config_entries.async_update_entry(
-                    self._entry,
-                    data={
-                        "access_token": self._access_token,
-                        "refresh_token": self._refresh_token,
-                        "expires_in": expires_in,
-                    }
-                )
-    
+
+                if status != 200:
+                    _LOGGER.error("Failed to refresh token (HTTP %s)", status)
+                    raise SuperloopApiError(f"Failed to refresh token: HTTP {status}")
+
+                try:
+                    data = await response.json()
+                    _LOGGER.debug("Successfully parsed refresh token response JSON with keys: %s", list(data.keys()))
+                    
+                    old_access_token = self._access_token
+                    self._access_token = data["access_token"]
+                    self._refresh_token = data["refresh_token"]
+                    expires_in = data.get("expires_in", 14400)
+                    self._token_expiry_time = datetime.utcnow() + timedelta(seconds=expires_in)
+
+                    _LOGGER.info("Successfully refreshed tokens. Old token: %s..., New token: %s..., Expires in: %s seconds", 
+                                old_access_token[:10] if old_access_token else None,
+                                self._access_token[:10] if self._access_token else None,
+                                expires_in)
+
+                    self._hass.config_entries.async_update_entry(
+                        self._entry,
+                        data={
+                            "access_token": self._access_token,
+                            "refresh_token": self._refresh_token,
+                            "expires_in": expires_in,
+                        }
+                    )
+                except Exception as json_ex:
+                    _LOGGER.exception("Error parsing refresh token JSON response: %s", str(json_ex))
+                    raise SuperloopApiError(f"Failed to parse refresh token response: {str(json_ex)}")
+
         except asyncio.TimeoutError as ex:
             _LOGGER.error("Timeout refreshing token")
             raise SuperloopApiError("Timeout refreshing token") from ex
-
-
+        except Exception as ex:
+            _LOGGER.exception("Unexpected error during token refresh: %s", str(ex))
+            raise
 
     async def async_check_and_refresh_token_if_needed(self):
         """Check if access token is close to expiry and refresh if needed."""
@@ -161,13 +187,21 @@ class SuperloopClient:
             _LOGGER.warning("Token expiry time not set, skipping silent refresh check.")
             return
 
+        # Calculate time remaining
+        time_remaining = self._token_expiry_time - now
+        _LOGGER.debug("Token expiry check: %s minutes remaining until token expires", 
+                    time_remaining.total_seconds() / 60)
+
         # If less than 3.5 hours remaining, refresh proactively
-        if (self._token_expiry_time - now) < timedelta(minutes=210):
-            _LOGGER.info("Access token nearing expiry, refreshing proactively.")
+        if time_remaining < timedelta(minutes=210):
+            _LOGGER.info("Access token nearing expiry (%s minutes remaining), refreshing proactively.", 
+                        time_remaining.total_seconds() / 60)
             try:
                 await self._try_refresh_token()
             except ConfigEntryAuthFailed:
                 _LOGGER.error("Proactive token refresh failed, reauthentication needed soon.")
+            except Exception as ex:
+                _LOGGER.exception("Unexpected error during proactive token refresh: %s", str(ex))
 
     @property
     def access_token(self) -> str:

@@ -23,12 +23,18 @@ class SuperloopCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self):
         """Fetch the latest service data from Superloop (regular usage)."""
+        _LOGGER.debug("Coordinator update starting")
         try:
-            return await self.client.async_get_services()
+            services_data = await self.client.async_get_services()
+            _LOGGER.debug("Coordinator update successful: %s broadband services found", 
+                        len(services_data.get("broadband", [])))
+            return services_data
         except ConfigEntryAuthFailed as err:
+            _LOGGER.error("Authentication failed during coordinator update: %s", str(err))
             # CRITICAL: Re-raise authentication errors so HA can trigger reauth
             raise err
         except Exception as err:
+            _LOGGER.exception("Error fetching Superloop service data: %s", str(err))
             raise UpdateFailed(f"Error fetching Superloop service data: {err}") from err
     
     async def async_update_daily_usage(self):
