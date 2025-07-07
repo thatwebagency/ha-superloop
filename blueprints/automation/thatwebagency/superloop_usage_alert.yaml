@@ -23,27 +23,22 @@ blueprint:
           domain: sensor
 
 trigger:
-  # Fire on *any* change to your usage sensor
   - platform: state
     entity_id: !input usage_sensor
 
 condition:
   - condition: template
     value_template: >
-      {# read raw states as strings #}
       {% set usage_str = states(input.usage_sensor) %}
       {% set allowance_str = states(input.allowance_sensor) %}
 
-      {# if either sensor has no value, bail out #}
       {% if not usage_str or not allowance_str %}
         false
       {% elif 'Unlimited Data' in allowance_str %}
         false
       {% else %}
-        {# convert to floats #}
         {% set current = usage_str | float %}
-        {# strip out any non-numeric chars (e.g. “ GB”) #}
-        {% set limit = allowance_str | regex_replace(find='[^0-9.]', replace='') | float %}
+        {% set limit = (allowance_str | regex_replace(find='[^0-9.]', replace='')) | float %}
         {{ current >= (limit * 0.9) }}
       {% endif %}
 
@@ -53,8 +48,8 @@ action:
       notification_id: superloop_usage_warning
       title: "Superloop Data Usage Warning"
       message: >
-        Your data usage has reached 90% of your plan allowance!
-        Current usage: {{ states(input.usage_sensor) }}  
-        Plan allowance: {{ states(input.allowance_sensor) }}.
+        Your data usage has reached 90% of your plan allowance!  
+        Current usage: {{ states(input.usage_sensor) }} GB  
+        Plan allowance: {{ states(input.allowance_sensor) }} GB
 
 mode: single
