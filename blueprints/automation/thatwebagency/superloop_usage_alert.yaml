@@ -27,15 +27,15 @@ trigger:
 condition:
   - condition: template
     value_template: >
-      {% set usage = states(input.usage_sensor) %}
-      {% set allowance = states(input.allowance_sensor) %}
-      {% if not usage or not allowance %}
+      {% set usage = states[inputs.usage_sensor] %}
+      {% set allowance = states[inputs.allowance_sensor] %}
+      {% if not usage.state or not allowance.state %}
         false
-      {% elif 'Unlimited Data' in allowance %}
+      {% elif 'Unlimited Data' in allowance.state %}
         false
       {% else %}
-        {% set current = usage | float %}
-        {% set limit = allowance.replace('GB', '') | float %}
+        {% set current = usage.state | float %}
+        {% set limit = allowance.state.replace('GB', '') | float %}
         {{ current >= (limit * 0.9) }}
       {% endif %}
 
@@ -45,6 +45,6 @@ action:
       title: "Superloop Usage Warning"
       message: >
         Your data usage has reached 90% of your plan allowance!
-        Current usage: {{ states(usage_sensor) }} GB out of {{ states(allowance_sensor) }}.
+        Current usage: {{ states[inputs.usage_sensor].state }} GB out of {{ states[inputs.allowance_sensor].state }} GB.
 
 mode: single
