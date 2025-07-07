@@ -1,50 +1,60 @@
 blueprint:
   name: Superloop Usage Alert
   description: >
-    Sends a persistent notification when your Superloop data usage reaches 90% of your plan's allowance.
-    Skips plans with unlimited data.
+    Sends (or updates) a persistent notification when your Superloop
+    data usage reaches 90% of your plan allowance.
+    Skips plans with “Unlimited Data.”
   domain: automation
+  version: 1
+
   input:
     usage_sensor:
       name: Data Usage Sensor
-      description: Select your Superloop Free Download Usage sensor (e.g., sensor.superloop_free_download_usage).
+      description: Select your Superloop download usage sensor
       selector:
         entity:
           domain: sensor
 
     allowance_sensor:
       name: Plan Allowance Sensor
-      description: Select your Superloop Plan Allowance sensor (e.g., sensor.superloop_plan_allowance).
+      description: Select your Superloop plan allowance sensor
       selector:
         entity:
           domain: sensor
 
 trigger:
-  - platform: numeric_state
+  # Fire on *any* change to your usage sensor
+  - platform: state
     entity_id: !input usage_sensor
-    above: 0
 
 condition:
   - condition: template
     value_template: >
-      {% set usage = states[('' ~ input_usage_sensor)] %}
-      {% set allowance = states[('' ~ input_allowance_sensor)] %}
-      {% if not usage.state or not allowance.state %}
+      {# read raw states as strings #}
+      {% set usage_str = states(input.usage_sensor) %}
+      {% set allowance_str = states(input.allowance_sensor) %}
+
+      {# if either sensor has no value, bail out #}
+      {% if not usage_str or not allowance_str %}
         false
-      {% elif 'Unlimited Data' in allowance.state %}
+      {% elif 'Unlimited Data' in allowance_str %}
         false
       {% else %}
-        {% set current = usage.state | float %}
-        {% set limit = allowance.state.replace('GB', '') | float %}
+        {# convert to floats #}
+        {% set current = usage_str | float %}
+        {# strip out any non-numeric chars (e.g. “ GB”) #}
+        {% set limit = allowance_str | regex_replace(find='[^0-9.]', replace='') | float %}
         {{ current >= (limit * 0.9) }}
       {% endif %}
 
 action:
   - service: persistent_notification.create
     data:
-      title: "Superloop Usage Warning"
+      notification_id: superloop_usage_warning
+      title: "Superloop Data Usage Warning"
       message: >
         Your data usage has reached 90% of your plan allowance!
-        Current usage: {{ states[('' ~ input_usage_sensor)].state }} GB out of {{ states[('' ~ input_allowance_sensor)].state }} GB.
+        Current usage: {{ states(input.usage_sensor) }}  
+        Plan allowance: {{ states(input.allowance_sensor) }}.
 
 mode: single
