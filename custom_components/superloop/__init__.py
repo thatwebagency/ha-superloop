@@ -82,6 +82,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         try:
             await client.async_check_and_refresh_token_if_needed(force=True)
             _LOGGER.info("Superloop token refreshed manually")
+
+            # 🔁 Force full reload to update coordinator/client state
+            await hass.config_entries.async_reload(entry.entry_id)
+
         except Exception as err:
             _LOGGER.error("Failed to manually refresh token: %s", err)
 

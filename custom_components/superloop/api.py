@@ -182,6 +182,8 @@ class SuperloopClient:
                             "expires_in": expires_in,
                         }
                     )
+                    await self._hass.config_entries.async_reload(self._entry.entry_id)
+                    
                 except Exception as json_ex:
                     _LOGGER.exception("Failed to parse refresh token response JSON: %s", str(json_ex))
                     raise SuperloopApiError(f"Failed to parse refresh token response: {str(json_ex)}")
