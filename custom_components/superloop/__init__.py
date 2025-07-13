@@ -93,8 +93,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         DOMAIN, "refresh_token", async_refresh_token_service
     )
 
-    return True
-
     # ✅ BACKGROUND SILENT REFRESH SETUP
     async def _background_refresh_tokens(now):
         """Periodic background check to refresh token before expiry."""

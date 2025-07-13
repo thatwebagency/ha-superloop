@@ -126,10 +126,7 @@ class SuperloopClient:
     async def _try_refresh_token(self):
         """Refresh access token."""
         payload = {
-            "grant_type": "refresh_token",
-            "refresh_token": self._refresh_token,
-            "persistLogin": True,
-            "brand": "superloop"
+        "refresh_token": self._refresh_token
         }
 
         _LOGGER.debug("Sending refresh payload to %s", REFRESH_URL)
