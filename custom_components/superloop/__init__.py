@@ -1,5 +1,5 @@
 import logging
-from datetime import time, timedelta
+from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -13,9 +13,8 @@ from .coordinator import SuperloopCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 DOMAIN = "superloop"
-
-# ✅ Platforms handled
 PLATFORMS = ["sensor"]
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Superloop from a config entry."""
@@ -50,18 +49,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
-    # ✅ Forward to platforms (like sensors)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # ✅ DAILY FETCH SETUP
+    # === Scheduled Daily Usage Fetch ===
     async def _schedule_daily_usage(now):
         _LOGGER.debug("Scheduled daily usage fetch triggered")
         await coordinator.async_update_daily_usage()
 
-    # Fetch daily usage once on boot
     hass.async_create_task(coordinator.async_update_daily_usage())
 
-    # Schedule fetch at 6:05 AM every day
     async_track_time_change(
         hass,
         _schedule_daily_usage,
@@ -70,40 +66,40 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         second=0,
     )
 
+    # === Manual Refresh Data Service ===
     async def async_refresh_data_service(call: ServiceCall) -> None:
         """Handle refresh data service call."""
         _LOGGER.debug("Manual refresh data service called")
-        await coordinator.async_refresh()
-        _LOGGER.info("Superloop data refreshed manually")
+        coordinator = hass.data[DOMAIN].get(entry.entry_id)
+        if coordinator:
+            await coordinator.async_refresh()
+            _LOGGER.info("Superloop data refreshed manually")
 
+    # === Manual Refresh Token Service ===
     async def async_refresh_token_service(call: ServiceCall) -> None:
-        """Handle refresh token service call."""
+        """Handle manual token refresh."""
         _LOGGER.debug("Manual refresh token service called")
+        coordinator = hass.data[DOMAIN].get(entry.entry_id)
+        if not coordinator:
+            _LOGGER.error("Coordinator not found for entry: %s", entry.entry_id)
+            return
         try:
-            await client.async_check_and_refresh_token_if_needed(force=True)
+            await coordinator.client.async_check_and_refresh_token_if_needed(force=True)
             _LOGGER.info("Superloop token refreshed manually")
-
-            # 🔁 Force full reload to update coordinator/client state
-            await hass.config_entries.async_reload(entry.entry_id)
-
+            # ✅ api.py already calls async_reload — no need to repeat it here
         except Exception as err:
-            _LOGGER.error("Failed to manually refresh token: %s", err)
+            _LOGGER.exception("Failed to manually refresh token: %s", err)
 
-    # Register the services
-    hass.services.async_register(
-        DOMAIN, "refresh_data", async_refresh_data_service
-    )
-    hass.services.async_register(
-        DOMAIN, "refresh_token", async_refresh_token_service
-    )
+    hass.services.async_register(DOMAIN, "refresh_data", async_refresh_data_service)
+    hass.services.async_register(DOMAIN, "refresh_token", async_refresh_token_service)
 
-    # ✅ BACKGROUND SILENT REFRESH SETUP
+    # === Silent Token Refresh Every 10 Minutes ===
     async def _background_refresh_tokens(now):
-        """Periodic background check to refresh token before expiry."""
-        _LOGGER.debug("Checking if token refresh is needed...")
-        await client.async_check_and_refresh_token_if_needed()
+        _LOGGER.debug("Checking if token refresh is needed (background)...")
+        coordinator = hass.data[DOMAIN].get(entry.entry_id)
+        if coordinator:
+            await coordinator.client.async_check_and_refresh_token_if_needed()
 
-    # Every 10 minutes, check if we need to refresh token
     async_track_time_interval(
         hass,
         _background_refresh_tokens,
@@ -111,6 +107,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
 
     return True
+
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a Superloop config entry."""

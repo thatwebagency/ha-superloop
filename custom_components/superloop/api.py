@@ -2,7 +2,6 @@ import logging
 import aiohttp
 import async_timeout
 import asyncio
-import json
 from datetime import datetime, timedelta
 
 from homeassistant.exceptions import ConfigEntryAuthFailed
@@ -10,7 +9,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 _LOGGER = logging.getLogger(__name__)
 
 BASE_API_URL = "https://webservices.myexetel.exetel.com.au/api"
-REFRESH_URL = f"{BASE_API_URL}/auth/token/refresh"
+REFRESH_URL = "https://webservices.myexetel.exetel.com.au/api/auth/token/refresh"
 
 class SuperloopApiError(Exception):
     """General Superloop API exception."""
@@ -23,10 +22,12 @@ class SuperloopClient:
         self._hass = hass
         self._entry = entry
         self._session = aiohttp.ClientSession()
-        self._token_expiry_time = datetime.utcnow() + timedelta(seconds=expires_in) if expires_in else None
+        if expires_in:
+            self._token_expiry_time = datetime.utcnow() + timedelta(seconds=expires_in)
+        else:
+            self._token_expiry_time = None
 
     async def async_close(self):
-        """Close session."""
         if not self._session.closed:
             await self._session.close()
 
@@ -38,9 +39,8 @@ class SuperloopClient:
         }
 
     async def async_get_services(self):
-        """Fetch user services."""
         headers = self._build_headers()
-        _LOGGER.debug("Fetching services with access token: %s...", self._access_token[:10])
+        _LOGGER.debug("Fetching services with access token: %s...", self._access_token[:10] if self._access_token else None)
 
         try:
             async with async_timeout.timeout(30):
@@ -58,7 +58,7 @@ class SuperloopClient:
                         raise ConfigEntryAuthFailed("Token refresh failed") from err
 
                     headers = self._build_headers()
-                    _LOGGER.debug("Retrying GET request with new token: %s...", self._access_token[:10])
+                    _LOGGER.debug("Retrying GET request with new token: %s...", self._access_token[:10] if self._access_token else None)
                     response = await self._session.get(f"{BASE_API_URL}/getServices/", headers=headers)
                     status = response.status
                     _LOGGER.debug("Retry getServices status: %s", status)
@@ -73,7 +73,7 @@ class SuperloopClient:
                     raise SuperloopApiError(f"Failed to fetch services: HTTP {status}")
 
                 data = await response.json()
-                _LOGGER.debug("Superloop API getServices response: %s broadband services", len(data.get("broadband", [])))
+                _LOGGER.debug("Service response data: %s", data)
                 return data
 
         except asyncio.TimeoutError as ex:
@@ -84,7 +84,6 @@ class SuperloopClient:
             raise
 
     async def async_get_daily_usage(self, service_id: int):
-        """Fetch daily broadband usage."""
         headers = self._build_headers()
         url = f"{BASE_API_URL}/getBroadbandDailyUsage/{service_id}"
 
@@ -119,7 +118,6 @@ class SuperloopClient:
             raise SuperloopApiError("Timeout fetching daily usage") from ex
 
     async def _try_refresh_token(self):
-        """Refresh access token."""
         payload = {
             "refresh_token": self._refresh_token
         }
@@ -150,13 +148,7 @@ class SuperloopClient:
 
                 try:
                     data = await response.json()
-
-                    # 🔍 Log the full refresh token response
-                    access_token_log = data.get("access_token", "")[:50] + "..." if "access_token" in data else "<missing>"
-                    refresh_token_log = data.get("refresh_token", "")[:50] + "..." if "refresh_token" in data else "<missing>"
-                    _LOGGER.debug("Full access token (first 50 chars): %s", access_token_log)
-                    _LOGGER.debug("Full refresh token (first 50 chars): %s", refresh_token_log)
-                    _LOGGER.debug("Complete token refresh response:\n%s", json.dumps(data, indent=2))
+                    _LOGGER.debug("Parsed token refresh response keys: %s", list(data.keys()))
 
                     old_access_token = self._access_token
                     self._access_token = data["access_token"]
@@ -182,8 +174,10 @@ class SuperloopClient:
                             "expires_in": expires_in,
                         }
                     )
+
+                    # ✅ Force reload to apply updated client everywhere
                     await self._hass.config_entries.async_reload(self._entry.entry_id)
-                    
+
                 except Exception as json_ex:
                     _LOGGER.exception("Failed to parse refresh token response JSON: %s", str(json_ex))
                     raise SuperloopApiError(f"Failed to parse refresh token response: {str(json_ex)}")
@@ -196,7 +190,6 @@ class SuperloopClient:
             raise
 
     async def async_check_and_refresh_token_if_needed(self, force=False):
-        """Check if access token is close to expiry and refresh if needed."""
         now = datetime.utcnow()
 
         if self._token_expiry_time is None:
@@ -216,7 +209,11 @@ class SuperloopClient:
                       time_remaining.total_seconds() / 60)
 
         if force or time_remaining < timedelta(minutes=210):
-            _LOGGER.info("Access token nearing expiry or forced, refreshing...")
+            if force:
+                _LOGGER.info("Forced token refresh requested")
+            else:
+                _LOGGER.info("Access token nearing expiry (%s minutes remaining), refreshing proactively.", 
+                             time_remaining.total_seconds() / 60)
             try:
                 await self._try_refresh_token()
                 return True
