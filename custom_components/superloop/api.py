@@ -267,7 +267,7 @@ class SuperloopClient:
 
         url = f"{SPEED_BOOST_BASE}/speed-boost/{service_id}"
         headers = {"Authorization": f"Bearer {self._access_token}", "Content-Type": "application/json"}
-        payload = {"scheduleStartDate": start_str, "boostDays": int(boost_days)}
+        payload = {"startDate": start_str, "boostDays": int(boost_days)}
 
         async with async_timeout.timeout(20):
             resp = await self._session.post(url, json=payload, headers=headers)
