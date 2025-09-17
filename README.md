@@ -4,6 +4,7 @@
 
 <hr>
 <h1>UPDATED! We now use a jwt auth flow that should last 365 days with no need for 2FA.</h1>
+<h2><strong>Please remove any existing configurations or accounts saved and begin intergration again</strong></h2>
 <h2>🌟 Features</h2>
 <p>This integration provides real-time Superloop account sensors for:</p>
 <ul>
