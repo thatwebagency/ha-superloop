@@ -103,6 +103,52 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.services.async_register(DOMAIN, "refresh_data", async_refresh_data_service)
     hass.services.async_register(DOMAIN, "refresh_token", async_refresh_token_service)
 
+    # === Speed Boost Service ===
+    async def async_speed_boost_service(call: ServiceCall) -> None:
+        """
+        Enable a speed boost.
+        Service: superloop.speed_boost
+        Fields:
+            - days: int (default 1)
+            - start: string ISO datetime (optional; default now in HA TZ)
+            - customer_id: int (optional)
+        """
+        coord = hass.data[DOMAIN].get(entry.entry_id)
+        if not coord:
+            _LOGGER.error("Coordinator not found for entry: %s", entry.entry_id)
+            return
+
+        days = int(call.data.get("days", 1))
+        start_str = call.data.get("start")  # ISO like "2025-09-17T08:30:00+10:00"
+        customer_id = call.data.get("customer_id")
+
+        # Parse start (optional)
+        start_dt = None
+        if start_str:
+            from homeassistant.util import dt as dt_util
+            start_dt = dt_util.parse_datetime(start_str)
+            if start_dt is None:
+                _LOGGER.warning("Invalid start datetime '%s'; using now.", start_str)
+            else:
+                # Ensure timezone-aware in HA TZ
+                if start_dt.tzinfo is None:
+                    start_dt = dt_util.as_local(start_dt.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE))
+                else:
+                    start_dt = dt_util.as_local(start_dt)
+
+        try:
+            result = await coord.client.async_enable_speed_boost(start_dt_aware=start_dt, boost_days=days, customer_id=customer_id)
+            _LOGGER.info("Speed boost requested: %s", result)
+        except ConfigEntryAuthFailed as err:
+            _LOGGER.error("Auth failed while enabling speed boost: %s", err)
+            # Let the UI prompt reauth on next update
+            raise
+        except Exception as err:
+            _LOGGER.exception("Speed boost request failed: %s", err)
+
+    hass.services.async_register(DOMAIN, "speed_boost", async_speed_boost_service)
+
+    
     # === Silent Token Refresh (every 10 min; no-op for login-jwt) ===
     async def _background_refresh_tokens(now):
         _LOGGER.debug("Background token refresh check…")
@@ -129,47 +175,3 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     return unload_ok
 
-# === Speed Boost Service ===
-async def async_speed_boost_service(call: ServiceCall) -> None:
-    """
-    Enable a speed boost.
-    Service: superloop.speed_boost
-    Fields:
-      - days: int (default 1)
-      - start: string ISO datetime (optional; default now in HA TZ)
-      - customer_id: int (optional)
-    """
-    coord = hass.data[DOMAIN].get(entry.entry_id)
-    if not coord:
-        _LOGGER.error("Coordinator not found for entry: %s", entry.entry_id)
-        return
-
-    days = int(call.data.get("days", 1))
-    start_str = call.data.get("start")  # ISO like "2025-09-17T08:30:00+10:00"
-    customer_id = call.data.get("customer_id")
-
-    # Parse start (optional)
-    start_dt = None
-    if start_str:
-        from homeassistant.util import dt as dt_util
-        start_dt = dt_util.parse_datetime(start_str)
-        if start_dt is None:
-            _LOGGER.warning("Invalid start datetime '%s'; using now.", start_str)
-        else:
-            # Ensure timezone-aware in HA TZ
-            if start_dt.tzinfo is None:
-                start_dt = dt_util.as_local(start_dt.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE))
-            else:
-                start_dt = dt_util.as_local(start_dt)
-
-    try:
-        result = await coord.client.async_enable_speed_boost(start_dt_aware=start_dt, boost_days=days, customer_id=customer_id)
-        _LOGGER.info("Speed boost requested: %s", result)
-    except ConfigEntryAuthFailed as err:
-        _LOGGER.error("Auth failed while enabling speed boost: %s", err)
-        # Let the UI prompt reauth on next update
-        raise
-    except Exception as err:
-        _LOGGER.exception("Speed boost request failed: %s", err)
-
-hass.services.async_register(DOMAIN, "speed_boost", async_speed_boost_service)
