@@ -13,7 +13,7 @@ from .coordinator import SuperloopCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 DOMAIN = "superloop"
-PLATFORMS = ["sensor"]
+PLATFORMS = ["sensor", "button"]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
