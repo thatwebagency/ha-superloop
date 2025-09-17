@@ -6,7 +6,7 @@ import base64
 import json
 import time
 from datetime import datetime, timedelta
-
+from homeassistant.util import dt as dt_util
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
@@ -14,7 +14,7 @@ _LOGGER = logging.getLogger(__name__)
 
 BASE_API_URL = "https://webservices.myexetel.exetel.com.au/api"
 REFRESH_URL  = "https://webservices.myexetel.exetel.com.au/api/auth/token/refresh"
-
+SPEED_BOOST_BASE = "https://webservices-api.superloop.com/v1"
 REFRESH_SKEW_SEC = 10 * 60  # refresh when <10 min remaining (legacy flow)
 
 class SuperloopApiError(Exception):
@@ -30,6 +30,17 @@ def _jwt_payload(token: str) -> dict | None:
         b64 = parts[1]
         pad = "=" * (-len(b64) % 4)
         return json.loads(base64.urlsafe_b64decode(b64 + pad).decode("utf-8"))
+    except Exception:
+        return None
+    
+def _jwt_customer_id(token: str) -> int | None:
+    """Extract customer_id from current JWT (Exetel token)."""
+    try:
+        import json, base64
+        p = token.split(".")[1]
+        pad = "=" * (-len(p) % 4)
+        data = json.loads(base64.urlsafe_b64decode(p + pad).decode("utf-8"))
+        return int(data.get("customer_id")) if data.get("customer_id") is not None else None
     except Exception:
         return None
 
@@ -229,6 +240,99 @@ class SuperloopClient:
             },
         )
 
+    async def async_enable_speed_boost(
+        self,
+        start_dt_aware=None,   # datetime (timezone-aware). If None -> now (HA tz)
+        boost_days: int = 1,
+        customer_id: int | None = None,
+    ):
+        """
+        Enable speed boost for {customer_id}.
+        POST https://webservices-api.superloop.com/v1/speed-boost/{customer_id}
+        Body: {"startDate": "YYYY-MM-DD HH:mm:ss", "boostDays": <int>}
+        Auth: Bearer current Exetel token (works with login-jwt too)
+        """
+        # Ensure valid token if on legacy flow
+        await self._ensure_valid()
+
+        # Pick customer_id: explicit > entry.data > decode JWT
+        if customer_id is None:
+            customer_id = (
+                self._entry.data.get("customer_id")
+                or _jwt_customer_id(self._access_token)
+            )
+        if not customer_id:
+            raise SuperloopApiError("Cannot determine customer_id for speed boost")
+
+        # Datetime handling: default "now" in HA local tz, format required by API
+        if start_dt_aware is None:
+            start_dt_aware = dt_util.now()  # aware in HA timezone
+        # Format: "YYYY-MM-DD HH:mm:ss" (local time)
+        start_str = start_dt_aware.strftime("%Y-%m-%d %H:%M:%S")
+
+        url = f"{SPEED_BOOST_BASE}/speed-boost/{customer_id}"
+        headers = {"Authorization": f"Bearer {self._access_token}", "Content-Type": "application/json"}
+        payload = {"startDate": start_str, "boostDays": int(boost_days)}
+
+        _LOGGER.debug("POST %s payload=%s", url, payload)
+
+        try:
+            async with async_timeout.timeout(20):
+                resp = await self._session.post(url, json=payload, headers=headers)
+                text = await resp.text()
+            if resp.status in (401, 403):
+                # Legacy: one refresh then retry
+                if self._refresh_token:
+                    _LOGGER.warning("Speed boost unauthorized (%s). Refreshing then retry…", resp.status)
+                    await self._try_refresh_token()
+                    headers["Authorization"] = f"Bearer {self._access_token}"
+                    async with async_timeout.timeout(20):
+                        resp = await self._session.post(url, json=payload, headers=headers)
+                        text = await resp.text()
+                if resp.status in (401, 403):
+                    raise ConfigEntryAuthFailed(f"Speed boost unauthorized after refresh: {text[:200]}")
+            if resp.status >= 300:
+                raise SuperloopApiError(f"Speed boost failed HTTP {resp.status}: {text[:200]}")
+
+            # Most endpoints return JSON; try to parse but don’t explode if empty
+            try:
+                return await resp.json()
+            except Exception:
+                return {"status": "ok", "raw": text[:200]}
+
+        except asyncio.TimeoutError as ex:
+            raise SuperloopApiError("Timeout enabling speed boost") from ex
+
+    async def async_get_speed_boost_status(self, service_id: int) -> dict:
+        headers = self._build_headers()
+        url = f"{SPEED_BOOST_BASE}/speed-boost/{service_id}"
+        async with async_timeout.timeout(15):
+           resp = await self._session.get(url, headers=headers)
+        if resp.status == 401:
+           await self._try_refresh_token()
+           headers = self._build_headers()
+        async with async_timeout.timeout(15):
+                resp = await self._session.get(url, headers=headers)
+        if resp.status != 200:
+            raise SuperloopApiError(f"speed-boost status HTTP {resp.status}")
+        return await resp.json()  # expect { ..., "boostStatus": "Active"|"Inactive"|"Pending", ... }
+
+    async def async_get_speed_boost_history(self, service_id: int) -> list[dict]:
+        headers = self._build_headers()
+        url = f"{SPEED_BOOST_BASE}/speed-boost/{service_id}/history"
+        async with async_timeout.timeout(15):
+            resp = await self._session.get(url, headers=headers)
+        if resp.status == 401:
+            await self._try_refresh_token()
+            headers = self._build_headers()
+            async with async_timeout.timeout(15):
+                resp = await self._session.get(url, headers=headers)
+        if resp.status != 200:
+            raise SuperloopApiError(f"speed-boost history HTTP {resp.status}")
+        data = await resp.json()
+         # UI expects objects with boostDays, startDate, endDate
+        return data.get("data", data)
+    
     async def async_check_and_refresh_token_if_needed(self, force: bool = False):
         """
         Public hook if a platform wants to nudge a refresh.

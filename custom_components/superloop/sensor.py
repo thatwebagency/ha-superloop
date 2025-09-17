@@ -8,6 +8,13 @@ from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
+def _pick_service(services_data: dict) -> dict | None:
+    bb_list = (services_data or {}).get("broadband") or []
+    if not bb_list:
+        return None
+    return next((s for s in bb_list if (s.get("status") or "").upper() == "ACTIVE"), bb_list[0])
+
+
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up Superloop sensors."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
@@ -132,7 +139,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
             SuperloopSensor(
                 coordinator=coordinator,
                 service=service,
-                description="Speed Boost",
+                description="Speed Boost Available",
                 unique_id=f"superloop-{service_number}-speedboost",
                 unit_of_measurement=None,
                 icon="mdi:rocket",  # Rocket icon for speed boost
@@ -147,6 +154,17 @@ async def async_setup_entry(hass, entry, async_add_entities):
         SuperloopDailySensor(coordinator, "download"),
         SuperloopDailySensor(coordinator, "total"),
     ])
+
+    picked = _pick_service(coordinator.data or {})
+    if picked and picked.get("id"):
+        sensors.append(
+            SuperloopSpeedBoostStatusSensor(
+                coordinator=coordinator,
+                service=picked,
+                unique_id=f"superloop-{picked['serviceNumber']}-speed-boost-status",
+            )
+        )
+
 
     async_add_entities(sensors, True)
 
@@ -272,3 +290,47 @@ class SuperloopDailySensor(CoordinatorEntity, SensorEntity):
     @property
     def last_reset(self):
         return self._last_reset
+
+class SuperloopSpeedBoostStatusSensor(CoordinatorEntity, SensorEntity):
+    """String sensor that exposes the current Speed Boost status."""
+
+    def __init__(self, coordinator, service, unique_id):
+        super().__init__(coordinator)
+        self._service = service
+        self._attr_name = "Superloop Speed Boost Status"
+        self._attr_unique_id = unique_id
+        self._attr_icon = "mdi:rocket"
+
+    @property
+    def native_value(self):
+        """Return 'Active' / 'Inactive' / 'Pending' (or None if unknown)."""
+        status_obj = self.coordinator.speed_boost_status or {}
+        return status_obj.get("boostStatus")
+
+    @property
+    def extra_state_attributes(self):
+        """Expose raw API fields when available (handy for debugging/automation)."""
+        status_obj = self.coordinator.speed_boost_status or {}
+        # Common fields you might see: nextBoostDate, startDate, endDate, maxBoostDays, etc.
+        # We pass everything through as attrs.
+        return status_obj if isinstance(status_obj, dict) else {}
+
+    @property
+    def icon(self):
+        state = self.native_value
+        if state == "Active":
+            return "mdi:rocket-launch"
+        if state == "Pending":
+            return "mdi:rocket-outline"
+        return "mdi:rocket"
+
+    @property
+    def device_info(self):
+        """Group this under the Superloop service device like your other sensors."""
+        return {
+            "identifiers": {(DOMAIN, self._service["serviceNumber"])},
+            "name": "Superloop Service",
+            "manufacturer": "Superloop",
+            "model": self._service.get("planTitle", "Broadband Service"),
+            "entry_type": "service",
+        }

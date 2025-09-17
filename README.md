@@ -3,7 +3,7 @@
 <p>A sleek Home Assistant integration to monitor your <strong>Superloop</strong> broadband usage, plan, and billing status. Now with <strong>Usage Alerts</strong> and beautiful <strong>Mini Graph Cards</strong> support!</p>
 
 <hr>
-<h1>UPDATED! We now use a jwt auth flow that should last 365 days with no need for 2FA.</h1>
+<h1>UPDATED! We now use a jwt auth flow that should last 365 days with no need for 2FA. PLUS SPEED BOOST TRIGGER</h1>
 <h2><strong>Please remove any existing configurations or accounts saved and begin intergration again</strong></h2>
 <h2>🌟 Features</h2>
 <p>This integration provides real-time Superloop account sensors for:</p>
@@ -188,6 +188,38 @@ entities:
 
 <p>🎯 Done! You now have beautiful per-day tracking graphs!</p>
 
+
+<h3>Speed Boost Love Lace YAML Button Example</h3>
+<pre>
+<code>
+type: button
+name: Speed Boost (1 day)
+icon: mdi:rocket
+tap_action:
+  action: call-service
+  service: superloop.speed_boost
+  service_data:
+    days: 1
+</code>
+</pre>
+<br>
+
+<h3>Speed Boost Trigger Example</h3>
+<pre>
+<code>
+alias: Superloop Speed Boost Saturday
+trigger:
+  - platform: time
+    at: "06:00:00"
+condition:
+  - condition: time
+    weekday: [sat]
+action:
+  - service: superloop.speed_boost
+    data:
+      days: 1
+</code>
+</pre>
 <hr>
 
 <h2>🛠️ Troubleshooting</h2>
