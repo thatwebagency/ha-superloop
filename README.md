@@ -3,7 +3,7 @@
 <p>A sleek Home Assistant integration to monitor your <strong>Superloop</strong> broadband usage, plan, and billing status. Now with <strong>Usage Alerts</strong> and beautiful <strong>Mini Graph Cards</strong> support!</p>
 
 <hr>
-
+<h1>UPDATED! We now use a jwt auth flow that should last 365 days with no need for 2FA.</h1>
 <h2>🌟 Features</h2>
 <p>This integration provides real-time Superloop account sensors for:</p>
 <ul>
