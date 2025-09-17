@@ -20,18 +20,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Superloop from a config entry."""
     _LOGGER.debug("Setting up Superloop entry: %s", entry.entry_id)
 
-    access_token = entry.data["access_token"]
-    refresh_token = entry.data["refresh_token"]
-    expires_in = entry.data.get("expires_in")
+    data = entry.data
+    access_token = data["access_token"]
+    refresh_token = data.get("refresh_token")  # None for login-jwt flow
+    expires_in = data.get("expires_in")
+    expires_at_ms = data.get("expires_at_ms")
+    login_method = data.get("login_method")  # "login_jwt" or "legacy_auth" (optional)
 
+    # Build API client (handles both login-jwt and legacy tokens)
     client = SuperloopClient(
         access_token=access_token,
         refresh_token=refresh_token,
         hass=hass,
         entry=entry,
         expires_in=expires_in,
+        expires_at_ms=expires_at_ms,
+        login_method=login_method,
     )
 
+    # Coordinator drives updates; choose your cadence
     coordinator = SuperloopCoordinator(hass, client, update_interval_minutes=30)
 
     try:
@@ -44,14 +51,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.error("Failed to connect to Superloop API: %s", err)
         raise ConfigEntryNotReady from err
 
-    if DOMAIN not in hass.data:
-        hass.data[DOMAIN] = {}
-
+    hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # === Scheduled Daily Usage Fetch ===
+    # === Scheduled Daily Usage Fetch (06:05 local) ===
     async def _schedule_daily_usage(now):
         _LOGGER.debug("Scheduled daily usage fetch triggered")
         await coordinator.async_update_daily_usage()
@@ -70,41 +75,42 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     async def async_refresh_data_service(call: ServiceCall) -> None:
         """Handle refresh data service call."""
         _LOGGER.debug("Manual refresh data service called")
-        coordinator = hass.data[DOMAIN].get(entry.entry_id)
-        if coordinator:
-            await coordinator.async_refresh()
+        coord = hass.data[DOMAIN].get(entry.entry_id)
+        if coord:
+            await coord.async_refresh()
             _LOGGER.info("Superloop data refreshed manually")
 
-    # === Manual Refresh Token Service ===
+    # === Manual Refresh Token Service (legacy only) ===
     async def async_refresh_token_service(call: ServiceCall) -> None:
         """Handle manual token refresh."""
         _LOGGER.debug("Manual refresh token service called")
-        coordinator = hass.data[DOMAIN].get(entry.entry_id)
-        if not coordinator:
+        coord = hass.data[DOMAIN].get(entry.entry_id)
+        if not coord:
             _LOGGER.error("Coordinator not found for entry: %s", entry.entry_id)
             return
         try:
-            await coordinator.client.async_check_and_refresh_token_if_needed(force=True)
-            _LOGGER.info("Superloop token refreshed manually")
-            # ✅ api.py already calls async_reload — no need to repeat it here
+            refreshed = await coord.client.async_check_and_refresh_token_if_needed(force=True)
+            if refreshed:
+                _LOGGER.info("Superloop legacy token refreshed manually")
+            else:
+                if coord.client.refresh_token is None:
+                    _LOGGER.info("Entry uses login-jwt (no refresh token). Reauth required if expired.")
+                else:
+                    _LOGGER.info("Token not near expiry; no refresh performed.")
         except Exception as err:
             _LOGGER.exception("Failed to manually refresh token: %s", err)
 
     hass.services.async_register(DOMAIN, "refresh_data", async_refresh_data_service)
     hass.services.async_register(DOMAIN, "refresh_token", async_refresh_token_service)
 
-    # === Silent Token Refresh Every 10 Minutes ===
+    # === Silent Token Refresh (every 10 min; no-op for login-jwt) ===
     async def _background_refresh_tokens(now):
-        _LOGGER.debug("Checking if token refresh is needed (background)...")
-        coordinator = hass.data[DOMAIN].get(entry.entry_id)
-        if coordinator:
-            await coordinator.client.async_check_and_refresh_token_if_needed()
+        _LOGGER.debug("Background token refresh check…")
+        coord = hass.data[DOMAIN].get(entry.entry_id)
+        if coord:
+            await coord.client.async_check_and_refresh_token_if_needed()
 
-    async_track_time_interval(
-        hass,
-        _background_refresh_tokens,
-        timedelta(minutes=10),
-    )
+    async_track_time_interval(hass, _background_refresh_tokens, timedelta(minutes=10))
 
     return True
 

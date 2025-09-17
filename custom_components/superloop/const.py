@@ -3,25 +3,31 @@
 DOMAIN = "superloop"
 PLATFORMS = ["sensor"]
 
-# API
+# === API Base URLs ===
 API_BASE_URL = "https://webservices.myexetel.exetel.com.au/api"
+API_LEGACY_AUTH_TOKEN_ENDPOINT = "/auth/token"          # Legacy login + 2FA
+API_LEGACY_REFRESH_TOKEN_ENDPOINT = "/auth/token/refresh"
+API_LEGACY_VERIFY_2FA_ENDPOINT = "/auth/verify2fa"
+
+# New long-lived JWT login (no 2FA, 1 year expiry)
+API_JWT_LOGIN_URL = "https://webservices-api.superloop.com/v1/login-jwt"
+
+# Services / Usage
 API_GET_SERVICES_ENDPOINT = "/getServices"
-API_AUTH_TOKEN_ENDPOINT = "/auth/token"
-API_VERIFY_2FA_ENDPOINT = "/auth/verify2fa"  # New endpoint for 2FA verification
+API_GET_DAILY_USAGE_ENDPOINT = "/getBroadbandDailyUsage"  # append /{service_id}
 
 # Authentication Constants
 AUTH_BRAND = "superloop"
-AUTH_PERSIST_LOGIN = False
-
-# OAuth Config
-SUPERLOOP_LOGIN_URL = "https://superhub.superloop.com/login"
-AUTH_CALLBACK_PATH = "/api/superloop/auth"
+AUTH_PERSIST_LOGIN = True  # safer default with JWT login
 
 # Config Entry Keys
 CONF_ACCESS_TOKEN = "access_token"
-CONF_REFRESH_TOKEN = "refresh_token"
+CONF_REFRESH_TOKEN = "refresh_token"     # only present for legacy auth
 CONF_USERNAME = "username"
 CONF_PASSWORD = "password"
+CONF_EXPIRES_IN = "expires_in"
+CONF_EXPIRES_AT_MS = "expires_at_ms"
+CONF_LOGIN_METHOD = "login_method"       # "login_jwt" or "legacy_auth"
 
 # Authentication Error Messages
 AUTH_ERROR_INVALID_CREDENTIALS = "Invalid username or password"
