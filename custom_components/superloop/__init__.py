@@ -111,7 +111,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         Fields:
             - days: int (default 1)
             - start: string ISO datetime (optional; default now in HA TZ)
-            - customer_id: int (optional)
+            - service_id: int (optional)
         """
         coord = hass.data[DOMAIN].get(entry.entry_id)
         if not coord:
@@ -120,7 +120,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         days = int(call.data.get("days", 1))
         start_str = call.data.get("start")  # ISO like "2025-09-17T08:30:00+10:00"
-        customer_id = call.data.get("customer_id")
+        service_id = call.data.get("service_id")
 
         # Parse start (optional)
         start_dt = None
@@ -137,7 +137,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     start_dt = dt_util.as_local(start_dt)
 
         try:
-            result = await coord.client.async_enable_speed_boost(start_dt_aware=start_dt, boost_days=days, customer_id=customer_id)
+            result = await coord.client.async_enable_speed_boost(start_dt_aware=start_dt, boost_days=days, service_id=service_id)
             _LOGGER.info("Speed boost requested: %s", result)
         except ConfigEntryAuthFailed as err:
             _LOGGER.error("Auth failed while enabling speed boost: %s", err)
